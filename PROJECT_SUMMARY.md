@@ -195,7 +195,6 @@ title: 小雨的九月
 date: 2026-09-30
 month: 2026-09
 slug: 2026-09
-birthdate: 2023-03-16
 summary: 九月，两个地方。上山，下田。
 tags: [出行, 秋天]
 cover: liangzhu_01.jpg
@@ -208,15 +207,15 @@ cover: liangzhu_01.jpg
 | `date` | ✅ | 该月**最后一天**，决定排序 |
 | `month` | ⬜ | `YYYY-MM`，缺省取 `date` 前 7 位 |
 | `slug` | ✅ | **等于月份**（如 `2026-09`），同时是照片目录名 |
-| `birthdate` | ✅ | 出生日期（小雨 **2023-03-16**），年龄全靠它算 |
 | `summary` | ⬜ | 一句话概括这个月，显示在相册卡片上 |
-| `tags` | ⬜ | 标签数组 |
+| `tags` | ⬜ | 标签数组，**渲染为卡片上的标签**（如「出行」「秋天」） |
 | `cover` | ⬜ | 封面图，缺省取第一张 |
 
-> **孩子小名：小雨**，出生日期 **2023-03-16**。
-> **年龄全自动计算**：由 `formatAge(birthdate, date)` 得出，**不要手写 `age` 字段**。
-> 需要覆盖时才写 `age`，且它会**优先于**自动计算（写错会导致年龄长期错误）。
-> 规则：3 岁以内显示到「天」，更大只到「月」。
+> **孩子小名：小雨**。
+> **不显示年龄**：早期版本曾在卡片与页眉显示「3 岁 6 个月」这类年龄标签，2026-10-06 已移除 ——
+> 年龄是算出来的数据而非这趟内容本身的信息，且每次翻相册都重复展示同一串数字，对回顾没有增量。
+> 现改为展示**当月标签**（`tags` 字段）。`build.js` 的 `formatAge()` 与 front-matter 的
+> front-matter 的 `birthdate` / `age` 字段、`build.js` 的 `age` 死代码、`new-trip.js` 的 `--age` / `--birthdate` 参数**均已删除**。
 
 > ⚠️ **写成长记录前必读第 4.4 节的「文案铁律」**。违反铁律等同于 bug。
 
@@ -270,7 +269,7 @@ cover: liangzhu_01.jpg
 | 级别 | 定义 |
 |---|---|
 | **P0** | 阻塞：构建失败、图片引用缺失、模板变量残留、废弃类名残留、slug 不一致 |
-| **P1** | 重要：违反文案八条禁令、front-matter 缺字段、年龄算错、年月不一致、`::: stats`未闭合、引用块被拆散、图片重复引用、数量不一致 |
+| **P1** | 重要：违反文案八条禁令、front-matter 缺字段、年月不一致、`::: stats` 未闭合、引用块被拆散、图片重复引用、数量不一致 |
 | **P2** | 建议：字数超标、图说字数不足、移动端断点、`PROJECT_SUMMARY.md` 未同步 |
 
 > 审核 agent **只报不改**。发现问题由主agent 修复后重新构建并再次送审。
@@ -319,17 +318,21 @@ cover: liangzhu_01.jpg
 | 切换 | `templates/index.html` 内的 `setView(name, pushUrl)`，切换 `.view` 容器的 `hidden` |
 | URL | `?view=growth`（可分享、可收藏），用 `history.pushState` 写入，筛选参数用 `replaceState` |
 | 前进后退 | 监听 `popstate` 恢复对应视图 |
-| 成长视图展示 | **月度相册卡片墙**（`.albums` 网格），每张卡片含页眉（`GROWING FOOTPRINTS` kicker + 标题 + 年龄胶囊 + 大号年月）+ 封面图 + 摘要 |
+| 成长视图展示 | **月度相册卡片墙**（`.albums` 网格），每张卡片含页眉（`GROWING FOOTPRINTS` kicker + 标题 + **当月标签**（`.al-tags`） + 大号年月）+ 封面图 + 摘要 |
 | 空状态 | `content/growth/` 为空时显示提示 |
 | 联动 | 副标题的成长条数仅在成长视图显示；切视图时清掉另一视图的筛选参数 |
 
 **相册卡片 HTML 结构**（由 `build.js` 生成）：
 
 ```
-a.album → div.al-masthead（al-kicker / al-title / al-age + al-yy / al-mm）
+a.album → div.al-masthead
+│├ div.al-mh-left（al-kicker / al-title / div.al-tags > span.al-tag）
+│         └ div.al-mh-right（al-yy / al-mm）
         → img.al-cover
         → p.al-summary
 ```
+
+> 卡片副标是**当月标签**（来自 front-matter `tags`），不是年龄。
 
 ### 5.0.2 成长足迹详情页（杂志竖版）
 
@@ -337,7 +340,7 @@ a.album → div.al-masthead（al-kicker / al-title / al-age + al-yy / al-mm）
 
 ```
 article.album-page
-├── header.al-page-head    ← 返回链接 + kicker + 大标题 + 年龄/照片数 + 右侧大号年月
+├── header.al-page-head    ← 返回链接 + kicker + 大标题 + 照片数 + 右侧大号年月
 ├── div.al-body            ← md 渲染的正文（序 / 01 / 02 站点 / 本月小结）
 └── footer.al-page-foot    ← 左侧「2026 / 01」，右侧「一月结束」
 ```
@@ -583,7 +586,6 @@ wrangler pages deploy public --project-name=life-journal
 | 单文件上限 | GitHub 单文件 100MB | 压缩后远低于此 |
 | **push 不自动部署** | **线上是 Workers 不是 Pages，`git push` 不会触发构建** | 见第 7.2 节，或改用 Pages |
 | **pages.dev 同名占用** | `life-journal.pages.dev` 已被别的站占用（返回 200 但内容无关） | 创建项目时换名，勿被 200误导 |
-| **birthdate 必须准确** | 成长记录年龄全靠 `birthdate` + `date` 自动计算 | 填错会导致全部年龄偏小/偏大 |
 | Pages 公开性 | 生成的网址知道链接即可访问 | 敏感照片不要上传，或加访问控制 |
 | `.gitignore` | `public/` 和 `node_modules/` 必须忽略 | 已配置 |
 | 国内访问 | `pages.dev` 偶尔波动 | 可绑定自有域名 |
@@ -597,7 +599,7 @@ wrangler pages deploy public --project-name=life-journal
 npm run new -- --slug sanya --title "三亚三日" --date 2026-01-01 --location "海南·三亚"
 
 # 新增成长记录（--growth；slug 缺省用月份，标题默认「小雨的X月」）
-npm run new -- --growth --date 2026-03-31 --birthdate 2023-03-16
+npm run new -- --growth --date 2026-03-31
 
 npm run compress          # 压缩 photos/ 下所有图片
 npm run build             # 生成 public/
@@ -626,6 +628,8 @@ npm run dev               # 构建 + 本地预览 (http://localhost:8080)
 
 | 日期 | 类型 | 说明 |
 |---|---|---|
+| 2026-10-06 | docs | 补修上条遗留：`build.js:293` 的 `age: meta.age` 与 `new-trip.js:39` 的 `const age = args.age` 两处**死代码**已删（无消费方）；第 8 节「birthdate 必须准确」整行删除（约束已失效）；第 9 节命令去掉 `--birthdate`；第 5.0.1 节「年龄胶囊」改为「当月标签（`.al-tags`）」。审核清单 P1-3 补「不误判首页副标题的 N 个月（记录月数非年龄）」、P1-2 去掉 `birthdate` 以免与 P1-3 互斥、G-3 补「仅搜 *.html」（不限定会误命中二进制）、P2 图说补「成长区以原始 alt 为准，不受 4–8 字限制」 |
+| 2026-10-06 | refactor | **移除成长足迹的年龄标签**：相册卡片副标由「3 岁 6 个月」年龄胶囊改为**当月标签**（取自 front-matter `tags`，渲染为 `div.al-tags > span.al-tag`，九月版为「出行 · 秋天」）；详情页页眉删除 `{{age}}` 只留照片数；九月版数据卡第三项由「3 岁 6 个月 当时年龄」换为「2 个 去了的地方」；`content/growth/*.md` 移除 `birthdate` 字段；**彻底删除** `build.js` 的 `formatAge()` 函数、`birthdate` 字段处理与 `ageText` 变量；`new-trip.js` 同步移除 `--birthdate` 参数与模板字段；`style.css` 的 `.al-age` 改为 `.al-tags`/`.al-tag`。理由：年龄是算出来的数据而非内容本身的信息，每次翻相册重复展示同一串数字无增量。审核清单 P1-3 相应改为「不得出现年龄标签」。第 4.2.1 / 4.5 / 5.0.1 / 5.0.2 节已同步 |
 | 2026-10-06 | docs | **审核义务升级为全项目铁律一**：原「文档同步义务」改编号为铁律二，新增铁律一「任何代码改动都必须经独立 agent 检视」。`AGENTS.md` 同步新增铁律一（含适用范围表 7 步流程）；审核清单 `.workbuddy/skills/growth-review/SKILL.md` 从成长区专项扩展为全项目通用（新增 **G-1~G-10 通用必查**：构建退出码 / 旅行区未受影响 / 无 `{{}}` 残留 / 脚手架同步 / 新语法入文档 / 模板变量语法合法等）；第 3 节目录树与文末速查表补 `.workbuddy/`。**经两轮独立审核修 8 项 P1**（铁律一自身首轮即被报 4 项）：文档写的 safe-delete 绕法无效（逐项 unlink 无法绕过，阈值按整个 turn 累计计算）→ 改为实测有效的 `CODEBUDDY_SAFE_DELETE_BULK_THRESHOLD=100000`；执行顺序悖论（先送审后补日志导致 G-7 首轮必挂，且 G-6 同构）→ 改为「先补日志+同步受影响章节，再送审」；关闭自我豁免后门（规则文件本身一律不豁免）；豁免收窄为「纯措辞」；删除 `build.js` 里`timelineYears`/`timeline_years` 死代码（成长区改月刊后模板已无此占位）；统一部署口径为 Workers（技术栈表与数据流图不再写「Pages 自动构建」）；`birthdate` 示例旧值 `2024-05-20` → `2023-03-16`（第 9 节命令与 `new-trip.js` 两处）；「成长区专项」补归属说明；文末速查表补 `content/growth/` 与 `.workbuddy/` |
 | 2026-10-06 | fix | **确认小雨出生日期为 `2023-03-16`**（此前用 15 号占位），九月版年龄仍为 3 岁 6 个月（未跨月）。**字数下限由 300 下调为 200** —— 严格执行八条禁令后正文已无可写的客观事实，再往下只能靠形容词凑数；现九月版实际 283 字（含标点），合规。第 4.2.1 / 4.4 节与审核清单 SKILL.md 已同步 |
 | 2026-10-06 | fix | **三轮独立审核后清零 P0/P1**。审核机制见第 4.5 节与 `.workbuddy/skills/growth-review/SKILL.md`。修复的关键问题：**素材对照表不可信** —— `成长足迹工程/README.md` 把 `liangzhu_02`/`liangzhu_04` 场景写反，按它改 alt 会持续产生图文矛盾；改以 `02_源码/模板/index.html` 的原始 alt 为权威来源，10 张图 alt 全部逐字对齐。**修复页脚「九结束」缺「月」**（`templates/growth.html` 的 `{{month_cn}}` 需补「月」，影响所有月份）。清理 `〔图说〕` 双轨写法（`2026-09.md`/`_template.md`/`new-trip.js`/`PROJECT_SUMMARY` 四处），图说统一由图片 alt 承载。修正文案与素材不符：「石头缝里的小水坑…蹲了一会儿」→「石槽旁停了一会儿」、「九月水稻将熟」→「九月的稻子还是青的」、删除「她在路边看了一会儿稻田」（无画面依据）、删除攻略口吻「可以隔着栏杆喂」、良渚「五千年水稻田」事实错误。`build.js` 增加视频封面与 `photos:` 命名冲突校验（`console.warn`）。`birthdate` 文档示例改为实际的 实际值 并说明「不要手写 `age`」。 |

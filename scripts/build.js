@@ -223,40 +223,6 @@ function monthCn(ym) {
 }
 
 /**
- * 计算「X岁Y个月Z天」格式的年龄描述。
- * 用于成长足迹时间轴 —— 比日期更能体现成长的刻度。
- */
-function formatAge(birthDate, atDate) {
-  if (!birthDate) return '';
-  const b = new Date(birthDate);
-  const a = atDate ? new Date(atDate) : new Date();
-  if (isNaN(b.getTime()) || isNaN(a.getTime())) return '';
-
-  let years = a.getFullYear() - b.getFullYear();
-  let months = a.getMonth() - b.getMonth();
-  let days = a.getDate() - b.getDate();
-
-  if (days < 0) {
-    months -= 1;
-    // 借上个月天数
-    const prev = new Date(a.getFullYear(), a.getMonth(), 0).getDate();
-    days += prev;
-  }
-  if (months < 0) {
-    years -= 1;
-    months += 12;
-  }
-
-  const parts = [];
-  if (years > 0) parts.push(`${years} 岁`);
-  if (months > 0) parts.push(`${months} 个月`);
-  if (years === 0 && months === 0) parts.push(`${days} 天`);
-  else if (days > 0 && years < 3) parts.push(`${days} 天`);
-
-  return parts.join(' ');
-}
-
-/**
  * 读取一个内容目录，返回记录数组。
  * @param {string} dir内容目录
  * @param {string} base 资源路径前缀（'' = 首页同级；'..' = 子目录）
@@ -324,10 +290,8 @@ function readRecords(dir, base = '..') {
       cover,
       photos,
       // 成长足迹专属字段
-      age: meta.age || '',
       month: meta.month || String(meta.date || nameBase).slice(0, 7),
       monthCn: monthCn(meta.month || meta.date || nameBase),
-      birthdate: meta.birthdate || '',
       html: renderMarkdown(body, slug, base),
       bodyRaw: body,
     };
@@ -376,14 +340,8 @@ function main() {
   const trips = readRecords(CONTENT_DIR);
   const growth = readRecords(GROWTH_DIR);
 
-  // 成长记录：算年龄 + 按日期倒序
-  // age 字段优先；未填时用 birthdate + date 自动算
-  const growthRecords = growth
-    .map((t) => ({
-      ...t,
-      ageText: t.age || formatAge(t.birthdate, t.date),
-    }))
-    .sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  // 成长记录：按日期倒序
+  const growthRecords = growth.sort((a, b) => String(b.date).localeCompare(String(a.date)));
 
   // 按日期倒序
   trips.sort((a, b) => String(b.date).localeCompare(String(a.date)));
@@ -464,7 +422,9 @@ function main() {
       const cover = g.cover
         ? `<img class="al-cover" src="photos/${g.slug}/${g.cover}" alt="" loading="lazy">`
         : `<div class="al-cover al-cover--empty">✦</div>`;
-      const age = g.ageText ? `<span class="al-age">${escapeHtml(g.ageText)}</span>` : '';
+      const tagPills = (g.tags || [])
+        .map((tag) => `<span class="al-tag">${escapeHtml(tag)}</span>`)
+        .join('');
 
       return `
       <a class="album" href="growth/${g.slug}.html">
@@ -472,7 +432,7 @@ function main() {
           <div class="al-mh-left">
             <span class="al-kicker">GROWING FOOTPRINTS</span>
             <h3 class="al-title">${escapeHtml(g.title)}</h3>
-            ${age}
+            ${tagPills ? `<div class="al-tags">${tagPills}</div>` : ''}
           </div>
           <div class="al-mh-right">
             <span class="al-yy">${escapeHtml(yy)}</span>
@@ -538,7 +498,6 @@ function main() {
     const html = applyTemplate(growthTpl, {
       title: escapeHtml(g.title),
       date: escapeHtml(g.date),
-      age: escapeHtml(g.ageText),
       year: escapeHtml(yy),
       month_num: escapeHtml(mm),
       month_cn: escapeHtml(g.monthCn),
@@ -559,7 +518,7 @@ function main() {
   console.log(`✓ Built ${trips.length} trip(s) + ${growthRecords.length} growth record(s) → public/`);
   trips.forEach((t) => console.log(`   · ${t.date}  ${t.title}  (${t.photos.length} photos)`));
   growthRecords.forEach((g) =>
-    console.log(`   · ${g.date}  [成长] ${g.title}${g.ageText ? '  ' + g.ageText : ''}`)
+    console.log(`   · ${g.date}  [成长] ${g.title}  (${g.photos.length} photos)`)
   );
 }
 

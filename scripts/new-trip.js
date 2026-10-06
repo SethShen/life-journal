@@ -4,7 +4,7 @@
  *
  * 用法：
  *   npm run new -- --slug sanya --title "三亚三日" --date 2026-01-01 --location "海南·三亚"
- *   npm run new -- --growth --slug first-steps --title "第一次独立走路" --date 2026-01-18 --birthdate 2023-03-16
+ *   npm run new -- --growth --date 2026-03-31
  *
  * 会创建：
  *   游记：   content/<date>-<slug>.md  +  photos/<slug>/
@@ -36,8 +36,6 @@ const args = parseArgs(process.argv.slice(2));
 const isGrowth = Boolean(args.growth);
 const date = args.date || new Date().toISOString().slice(0, 10);
 const location = args.location || '';
-const birthdate = args.birthdate || '';
-const age = args.age || '';
 
 // 成长记录：slug 缺省用月份（如 2026-03），标题默认「小雨的X月」
 const month = args.month || date.slice(0, 7);
@@ -50,7 +48,7 @@ const title = args.title || (isGrowth ? `小雨的${monthCn}` : slug);
 if (!slug) {
   console.error('✗ 缺少 --slug 参数。示例：');
   console.error('  游记：npm run new -- --slug sanya --title "三亚三日" --date 2026-01-01 --location "海南·三亚"');
-  console.error('  成长：npm run new -- --growth --date 2026-03-31 --birthdate 2023-03-16');
+  console.error('  成长：npm run new -- --growth --date 2026-03-31');
   process.exit(1);
 }
 
@@ -71,7 +69,6 @@ title: 小雨的${monthCn}
 date: ${date}
 month: ${month}
 slug: ${month}
-birthdate: ${birthdate}
 summary: 一句话概括这个月。
 tags: [出行]
 cover: 001.jpg
