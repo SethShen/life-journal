@@ -8,31 +8,41 @@
 </head>
 <body>
 
-<header class="site-header site-header--trip site-header--growth">
-  <div class="wrap">
-    <a class="back" href="../index.html?view=growth">← 成长足迹</a>
-    <h1 class="trip-title">{{title}}</h1>
-    <div class="trip-meta">
-      <time>{{date}}</time>
-      <span class="tl-age tl-age--head">{{age}}</span>
-      {{milestone}}
-      <span class="photo-count">{{photo_count}} 张照片</span>
+<article class="album-page">
+
+  <!-- 页眉 -->
+  <header class="al-page-head">
+    <div class="al-page-head-l">
+      <a class="back" href="../index.html?view=growth">← 成长足迹</a>
+      <span class="al-kicker">GROWING FOOTPRINTS</span>
+      <h1 class="al-page-title">{{title}}</h1>
+      <div class="al-page-meta">
+        <span class="al-age">{{age}}</span>
+        <span class="photo-count">{{photo_count}} 张照片</span>
+      </div>
     </div>
-    <div class="card-tags">{{tags}}</div>
-  </div>
-</header>
+    <div class="al-page-head-r">
+      <span class="al-yy">{{year}}</span>
+      <span class="al-mm">{{month_num}} 月</span>
+    </div>
+  </header>
 
-<main class="wrap">
-  <article class="trip-content" id="content">
+  <!-- 正文（序 / 编号站点 / 小结） -->
+  <div class="al-body">
     {{content}}
-  </article>
-</main>
+  </div>
 
-<footer class="site-footer">
-  <div class="wrap">
+  <!-- 页脚 -->
+  <footer class="al-page-foot">
+    <span class="al-foot-l">{{year}} / {{month_num}}</span>
+    <span class="al-foot-r">{{month_cn}}结束</span>
+  </footer>
+
+  <div class="al-standalone">
     <a class="back" href="../index.html?view=growth">← 返回成长足迹</a>
   </div>
-</footer>
+
+</article>
 
 <!-- 灯箱 -->
 <div class="lightbox" id="lightbox" hidden>
@@ -46,7 +56,7 @@
 <script>
 (function () {
   var imgs = Array.prototype.slice.call(
-    document.querySelectorAll('.trip-content figure.photo img, .trip-content > img, .gallery-item img')
+    document.querySelectorAll('.al-body figure.photo img, .al-body > img, .gallery-item img')
   );
   if (!imgs.length) return;
 

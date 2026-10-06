@@ -72,11 +72,12 @@
   <div class="view" id="view-growth" hidden>
 
     <section class="growth-intro">
-      <p>按时间顺序，记录她长大的每一个刻度。</p>
+      <h2 class="gi-title">成长足迹</h2>
+      <p>每月一版。按时间顺序。</p>
     </section>
 
-    <div class="timeline" id="timeline">
-      {{timeline}}
+    <div class="albums" id="albums">
+      {{growth_albums}}
     </div>
 
     <div class="empty-state" id="growth-empty" hidden>
@@ -110,7 +111,7 @@
   };
   var growthSummary = document.getElementById('growth-summary');
   var growthEmpty = document.getElementById('growth-empty');
-  var timeline = document.getElementById('timeline');
+  var albums = document.getElementById('albums');
   var current = 'trips';
 
   function setView(name, pushUrl) {
@@ -127,8 +128,8 @@
     if (growthSummary) growthSummary.hidden = name !== 'growth';
 
     // 成长为空时提示
-    if (growthEmpty && timeline) {
-      growthEmpty.hidden = !!timeline.querySelector('.tl-item');
+    if (growthEmpty && albums) {
+      growthEmpty.hidden = !!albums.querySelector('.album');
     }
 
     if (pushUrl) {

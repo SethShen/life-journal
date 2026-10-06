@@ -34,23 +34,30 @@ function parseArgs(argv) {
 const args = parseArgs(process.argv.slice(2));
 
 const isGrowth = Boolean(args.growth);
-const slug = args.slug;
-const title = args.title || slug;
 const date = args.date || new Date().toISOString().slice(0, 10);
 const location = args.location || '';
 const birthdate = args.birthdate || '';
-const milestone = args.milestone || '';
 const age = args.age || '';
+
+// 成长记录：slug 缺省用月份（如 2026-03），标题默认「小雨的X月」
+const month = args.month || date.slice(0, 7);
+const MONTH_CN = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十', '十一', '十二'];
+const monthCn = MONTH_CN[parseInt(month.slice(5, 7), 10) - 1] || month;
+
+const slug = args.slug || (isGrowth ? month : '');
+const title = args.title || (isGrowth ? `小雨的${monthCn}` : slug);
 
 if (!slug) {
   console.error('✗ 缺少 --slug 参数。示例：');
   console.error('  游记：npm run new -- --slug sanya --title "三亚三日" --date 2026-01-01 --location "海南·三亚"');
-  console.error('  成长：npm run new -- --growth --slug first-steps --title "第一次独立走路" --date 2026-01-18 --birthdate 2024-05-20');
+  console.error('  成长：npm run new -- --growth --date 2026-03-31 --birthdate 2024-05-20');
   process.exit(1);
 }
 
 const contentDir = isGrowth ? path.join(CONTENT_DIR, 'growth') : CONTENT_DIR;
-const mdPath = path.join(contentDir, `${date}-${slug}.md`);
+// 成长记录按月建档，文件名直接用 slug（月份），不再加日期前缀
+const fileBase = isGrowth ? slug : `${date}-${slug}`;
+const mdPath = path.join(contentDir, `${fileBase}.md`);
 const photoDir = path.join(PHOTOS_DIR, slug);
 
 if (fs.existsSync(mdPath)) {
@@ -60,27 +67,43 @@ if (fs.existsSync(mdPath)) {
 
 const template = isGrowth
   ? `---
-title: ${title}
+title: 小雨的${monthCn}
 date: ${date}
-slug: ${slug}
+month: ${month}
+slug: ${month}
 birthdate: ${birthdate}
 age: ${age || '（待填）'}
-milestone: ${milestone}
-summary: 一句话概括这一刻。
+summary: 一句话概括这个月。
 tags: [成长]
+cover: 001.jpg
 ---
 
-在这里写下这一刻的故事。
+## 序
 
-## 发生了什么
+> 这个月去了哪里，去了几次。
+> 天气、气温、穿了什么。
 
-当时的情形……
+## 01 站点名
 
-![照片说明](photos:001.jpg)
+> 地点。海拔或时长。
+> 客观事实描述，40–80 字。
 
-## 她的反应
+〔图说〕四到八字。
 
-……
+![图片说明](photos:001.jpg)
+
+## 02 站点名
+
+> 地点。第二站的内容。
+
+〔图说〕四到八字。
+
+![图片说明](photos:002.jpg)
+
+## 本月小结
+
+> 几趟出行，几张照片。
+> ${monthCn}结束。
 `
   : `---
 title: ${title}

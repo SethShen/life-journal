@@ -113,8 +113,16 @@ function renderMarkdown(md, slug, base = '') {
   html = html.replace(/^##\s+(.*)$/gm, '<h2>$1</h2>');
   html = html.replace(/^#\s+(.*)$/gm, '<h1>$1</h1>');
 
-  // 5) 引用
-  html = html.replace(/^&gt;\s?(.*)$/gm, '<blockquote>$1</blockquote>');
+  // 5) 引用 —— 先把「连续 > 行」合并成一个引用块，再包标签
+  html = html.replace(/((?:^&gt;.*$\r?\n?)+)/gm, (block) => {
+    const inner = block
+      .trim()
+      .split(/\r?\n/)
+      .map((l) => l.replace(/^&gt;\s?/, ''))
+      .filter((l) => l.length)
+      .join('<br>');
+    return `<blockquote>${inner}</blockquote>`;
+  });
 
   // 6) 无序列表
   html = html.replace(/^[-*]\s+(.*)$/gm, '<li>$1</li>');
@@ -156,6 +164,13 @@ function slugify(s) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '');
+}
+
+/** 2026-01 → 一月 */
+function monthCn(ym) {
+  const names = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十', '十一', '十二'];
+  const mm = parseInt(String(ym).slice(5, 7), 10);
+  return names[mm - 1] || String(ym);
 }
 
 /**
@@ -236,7 +251,8 @@ function readRecords(dir, base = '..') {
       photos,
       // 成长足迹专属字段
       age: meta.age || '',
-      milestone: meta.milestone || '',
+      month: meta.month || String(meta.date || nameBase).slice(0, 7),
+      monthCn: monthCn(meta.month || meta.date || nameBase),
       html: renderMarkdown(body, slug, base),
       bodyRaw: body,
     };
@@ -366,59 +382,37 @@ function main() {
   // 时间轴分组的年份（供 JS 生成分节）
   const timelineYears = Object.keys(yearCount).sort((a, b) => b.localeCompare(a));
 
-  // ---- 成长足迹：按月分组的时间轴 ----
-  const growthByMonth = {};
-  for (const g of growthRecords) {
-    const ym = String(g.date).slice(0, 7);
-    (growthByMonth[ym] = growthByMonth[ym] || []).push(g);
-  }
+  // ---- 成长足迹：月度相册卡片墙 ----
+  // 每月一版，杂志竖版结构（页眉大号月份 → 封面 → 编号站点 → 页脚小结）
+  const growthHtml = growthRecords
+    .map((g) => {
+      const yy = String(g.month).slice(0, 4);
+      const mm = String(g.month).slice(5, 7);
+      const cover = g.cover
+        ? `<img class="al-cover" src="photos/${g.slug}/${g.cover}" alt="" loading="lazy">`
+        : `<div class="al-cover al-cover--empty">✦</div>`;
+      const age = g.ageText ? `<span class="al-age">${escapeHtml(g.ageText)}</span>` : '';
 
-  const timeline =
-    Object.keys(growthByMonth)
-      .sort((a, b) => b.localeCompare(a))
-      .map((ym) => {
-        const [yy, mm] = ym.split('-');
-        const items = growthByMonth[ym]
-          .map((g) => {
-            const cover = g.cover
-              ? `<img class="tl-cover" src="photos/${g.slug}/${g.cover}" alt="" loading="lazy">`
-              : '';
-            const age = g.ageText
-              ? `<span class="tl-age">${escapeHtml(g.ageText)}</span>`
-              : '';
-            const milestone = g.milestone
-              ? `<span class="tl-milestone">${escapeHtml(g.milestone)}</span>`
-              : '';
-            const day = String(g.date).slice(8, 10);
-            return `
-          <li class="tl-item">
-            <div class="tl-marker" aria-hidden="true"></div>
-            <div class="tl-body">
-              <div class="tl-date"><span class="tl-day">${escapeHtml(day)}</span>${age}${milestone}</div>
-              <a class="tl-card" href="growth/${g.slug}.html">
-                ${cover}
-                <div class="tl-text">
-                  <h3 class="tl-title">${escapeHtml(g.title)}</h3>
-                  ${g.summary ? `<p class="tl-summary">${escapeHtml(g.summary)}</p>` : ''}
-                </div>
-              </a>
-            </div>
-          </li>`;
-          })
-          .join('');
+      return `
+      <a class="album" href="growth/${g.slug}.html">
+        <div class="al-masthead">
+          <div class="al-mh-left">
+            <span class="al-kicker">GROWING FOOTPRINTS</span>
+            <h3 class="al-title">${escapeHtml(g.title)}</h3>
+            ${age}
+          </div>
+          <div class="al-mh-right">
+            <span class="al-yy">${escapeHtml(yy)}</span>
+            <span class="al-mm">${escapeHtml(mm)} 月</span>
+          </div>
+        </div>
+        ${cover}
+        ${g.summary ? `<p class="al-summary">${escapeHtml(g.summary)}</p>` : ''}
+      </a>`;
+    })
+    .join('\n');
 
-        return `
-      <section class="tl-month">
-        <h3 class="tl-month-label"><span class="tl-year">${escapeHtml(yy)}</span><span class="tl-mon">${escapeHtml(mm)} 月</span></h3>
-        <ul class="tl-list">${items}
-        </ul>
-      </section>`;
-      })
-      .join('\n');
-
-  const growthCountText = growthRecords.length
-    ? `${growthRecords.length} 条记录`
-    : '';
+  const growthCountText = growthRecords.length ? `${growthRecords.length} 个月` : '';
 
   const indexHtml = applyTemplate(indexTpl, {
     cards,
@@ -426,9 +420,8 @@ function main() {
     tag_filters: tagFilters,
     year_filters: yearFilters,
     timeline_years: JSON.stringify(timelineYears),
-    timeline,
+    growth_albums: growthHtml,
     growth_count_text: escapeHtml(growthCountText),
-    has_growth: growthRecords.length ? 'true' : '',
     site_title: '生活记录',
     updated: new Date().toISOString().slice(0, 10),
   });
@@ -456,7 +449,7 @@ function main() {
     fs.writeFileSync(path.join(OUT_DIR, 'trip', `${t.slug}.html`), html);
   }
 
-  // ---- 生成成长足迹详情页 ----
+  // ---- 生成成长足迹详情页（杂志竖版） ----
   const growthTpl = readTemplate('growth.html');
   ensureDir(path.join(OUT_DIR, 'growth'));
   for (const g of growthRecords) {
@@ -467,11 +460,16 @@ function main() {
       )
       .join('');
 
+    const yy = String(g.month).slice(0, 4);
+    const mm = String(g.month).slice(5, 7);
+
     const html = applyTemplate(growthTpl, {
       title: escapeHtml(g.title),
       date: escapeHtml(g.date),
       age: escapeHtml(g.ageText),
-      milestone: g.milestone ? escapeHtml(g.milestone) : '',
+      year: escapeHtml(yy),
+      month_num: escapeHtml(mm),
+      month_cn: escapeHtml(g.monthCn),
       tags,
       content: g.html + renderGallery(g),
       photo_count: g.photos.length,
