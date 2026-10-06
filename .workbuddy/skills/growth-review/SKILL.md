@@ -21,7 +21,7 @@ description: life-journal 项目的强制审核清单（PROJECT_SUMMARY 第 0 �
 | # | 检查项 | 方法 |
 |---|---|---|
 | G-1 | **构建成功** | `node scripts/build.js` 退出码为 0 |
-| G-2 | **旅行区未受影响** | `content/*.md` 7 篇 → `public/trip/*.html` 应为 7 个，无异常 |
+| G-2 | **旅行区未受影响** | `content/*.md`（除 `_template`）→ `public/trip/*.html` 数量一致，无异常。⚠️ 篇数会随用户增删游记变化，**不要写死数字**，按实际 `ls` 核对 |
 | G-3 | 无未替换模板变量 | 产物**仅搜 `*.html`** 里的 `{{`（不限定会误命中 jpg/mp4 二进制），有即 P0 |
 | G-4 | 无废弃类名/语法残留 | 源码与产物均查|
 | G-5 | 产物已生成 | 改动涉及的页面在 `public/` 里有对应文件 |
@@ -30,6 +30,10 @@ description: life-journal 项目的强制审核清单（PROJECT_SUMMARY 第 0 �
 | G-8 | **脚手架同步** | 改了 `_template.md` 则 `new-trip.js` 生成的模板必须同步，反之亦然。**只改内容不改脚手架 = 下月必然复发** |
 | G-9 | **新语法已入文档** | 新增语法/字段已同步到 `PROJECT_SUMMARY.md` 的语法表与字段表 |
 | G-10 | **模板变量语法合法** | `applyTemplate()` 只支持 `{{name}}`，**不支持** `{{#x}}`/`{{^}}` mustache 条件语法 |
+| G-11 | **图片双引用体系一致** | 同一 slug 下`route[].spots/food[].photos` 与正文 `photos:` 引用**指向同一批图**。⚠️ 重排照片编号时**必须两侧同步**，只改一侧会图文错位 |
+| G-12 | **一次性脚本已迁出** | 迁移类脚本移出仓库后，`PROJECT_SUMMARY.md` 不得再把它当现行工具描述 |
+| G-13 | **内嵌数据已转义** | 注入 `<script type="application/json">` 的数据必须转义 `<` `>` `&`（防 `</script>` breakout）；正文走 `renderMarkdown()` 的 `escapeHtml()`，同样防 breakout |
+| G-14 | **UI承诺的功能已接上** | 若 CSS给了 `cursor:zoom-in` 等交互暗示，对应的 JS 处理器必须真的绑上了 |
 
 > **本机注意**：`build.js` 里的 `fs.rmSync(public, {recursive:true})` 会触发宿主 safe-delete 保护
 > （抛 `SAFE_DELETE_BULK_CONFIRM_REQUIRED`）。**该保护按整个 turn 内累计删除数计阈值，不是单次调用**，
@@ -53,6 +57,7 @@ description: life-journal 项目的强制审核清单（PROJECT_SUMMARY 第 0 �
 | P0-2 | **图片引用必须全部存在** | md 里每个 `photos:xxx` 与 `photos/<slug>/xxx` 实际文件比对，缺失即 P0（会渲染成碎图） |
 | P0-3 | **不能有未替换的模板变量** | 产物 HTML 里搜 `{{`，有即 P0 |
 | P0-4 | **不能残留已废弃的类名/语法** | 成长区不应再出现 `tl-item`/`tl-card`/`timeline`/`milestone`（已改月刊结构） |
+| P0-6 | **图文归属一致** | 正文小节标题与 `route` 里该景点/美食的照片必须对应。**编号存在 ≠ 图对** —— 逐个小节核对画面内容，不只看文件是否存在 |
 | P0-5 | **slug 与文件名/目录必须一致** | `slug: 2026-09` ⇒ 文件 `2026-09.md` + 目录 `photos/2026-09/` |
 
 ## P1 = 重要，影响质量

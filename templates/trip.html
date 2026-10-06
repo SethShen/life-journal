@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{{title}} · {{site_title}}</title>
 <link rel="stylesheet" href="../style.css">
+<style>{{route_css}}</style>
 </head>
 <body>
 
@@ -45,7 +46,7 @@
 <script>
 (function () {
   var imgs = Array.prototype.slice.call(
-    document.querySelectorAll('.trip-content figure.photo img, .trip-content > img, .gallery-item img')
+    document.querySelectorAll('.trip-content figure.photo img, .trip-content > img, .rt-shots img, .gallery-item img')
   );
   if (!imgs.length) return;
 

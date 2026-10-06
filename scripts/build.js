@@ -8,6 +8,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { ROUTE_CSS, renderRoutePage } = require('./route-page');
 
 const ROOT = path.resolve(__dirname, '..');
 const CONTENT_DIR = path.join(ROOT, 'content');
@@ -42,30 +43,130 @@ function escapeHtml(str = '') {
     .replace(/"/g, '&quot;');
 }
 
-/** 极简 YAML front-matter 解析（只支持 key: value 和 tags: [a, b]） */
+/** 去掉成对引号 */
+function unquote(s) {
+  const t = String(s).trim();
+  if (/^".*"$/.test(t) || /^'.*'$/.test(t)) {
+    return t.slice(1, -1).replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+  }
+  return t;
+}
+
+/** 解析行内数组 [a, b, c]，支持引号内含逗号 */
+function parseInlineArray(val) {
+  const inner = val.slice(1, -1).trim();
+  if (!inner) return [];
+  const out = [];
+  let buf = '';
+  let inStr = null;
+  for (const ch of inner) {
+    if (inStr) {
+      if (ch === inStr) inStr = null;
+      else buf += ch;
+    } else if (ch === '"' || ch === "'") inStr = ch;
+    else if (ch === ',') { out.push(buf.trim()); buf = ''; }
+    else buf += ch;
+  }
+  if (buf.trim()) out.push(buf.trim());
+  if (out.length && out.every((x) => x !== '' && !isNaN(Number(x)))) {
+    return out.map(Number);
+  }
+  return out;
+}
+
+/**
+ * 极简 YAML front-matter 解析
+ *  - 简单键值：key: value
+ *  - 行内数组：key: [a, b, c]
+ *  - 嵌套对象数组：key: 后接 `- k: v` 缩进块（route: 行程数据用）
+ */
 function parseFrontMatter(raw) {
   const match = raw.match(/^\uFEFF?---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
   if (!match) return { meta: {}, body: raw };
 
+  const lines = match[1].split(/\r?\n/);
   const meta = {};
-  for (const line of match[1].split(/\r?\n/)) {
-    const m = line.match(/^([A-Za-z_][\w-]*)\s*:\s*(.*)$/);
-    if (!m) continue;
-    const key = m[1];
-    let val = m[2].trim();
 
-    // 数组：[a, b, c]
-    if (/^\[.*\]$/.test(val)) {
-      val = val
-        .slice(1, -1)
-        .split(',')
-        .map((s) => s.trim().replace(/^["']|["']$/g, ''))
-        .filter(Boolean);
-    } else {
-      val = val.replace(/^["']|["']$/g, '');
+  /** 解析 `- k: v` 起始的对象块，返回 {obj, nextIndex} */
+  function parseItem(idx, indent) {
+    const line = lines[idx];
+    const m0 = line.match(/^\s*-\s+(.*)$/);
+    if (!m0) return null;
+    const obj = {};
+    const kv = m0[1].match(/^([A-Za-z_][\w-]*)\s*:\s*(.*)$/);
+    if (kv) {
+      const v = kv[2].trim();
+      obj[kv[1]] = /^\[.*\]$/.test(v) ? parseInlineArray(v) : unquote(v);
     }
-    meta[key] = val;
+    let k = idx + 1;
+    while (k < lines.length) {
+      const l2 = lines[k];
+      if (!l2.trim()) { k++; continue; }
+      const ind2 = l2.length - l2.trimStart().length;
+      if (ind2 <= indent) break;
+      const kv2 = l2.match(/^\s*([A-Za-z_][\w-]*)\s*:\s*(.*)$/);
+      if (!kv2) { k++; continue; }
+      const v2 = kv2[2].trim();
+      if (v2 === '') {
+        // 子数组：如 spots: / food:
+        // 结构为 `- k: v` 后接更深缩进的续行，需复用 parseItem 逻辑
+        const sub = [];
+        let m2 = k + 1;
+        const subIndent = ind2;
+        while (m2 < lines.length) {
+          const l3 = lines[m2];
+          if (!l3.trim()) { m2++; continue; }
+          const ind3 = l3.length - l3.trimStart().length;
+          if (ind3 <= subIndent) break;
+          if (/^\s*-\s+/.test(l3)) {
+            const r2 = parseItem(m2, ind3);
+            if (r2) { sub.push(r2.obj); m2 = r2.next; continue; }
+          }
+          m2++;
+        }
+        obj[kv2[1]] = sub;
+        k = m2;
+        continue;
+      }
+      obj[kv2[1]] = /^\[.*\]$/.test(v2) ? parseInlineArray(v2) : unquote(v2);
+      k++;
+    }
+    return { obj, next: k };
   }
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const top = line.match(/^([A-Za-z_][\w-]*)\s*:\s*(.*)$/);
+    if (!top) continue;
+    const key = top[1];
+    const val = top[2].trim();
+
+    if (val === '') {
+      // 顶层键后接缩进块 → 对象数组
+      let j = i + 1;
+      let baseIndent = null;
+      const items = [];
+      while (j < lines.length) {
+        const l = lines[j];
+        if (!l.trim()) { j++; continue; }
+        const ind = l.length - l.trimStart().length;
+        if (ind === 0) break;
+        if (baseIndent === null) baseIndent = ind;
+        if (ind < baseIndent) break;
+        if (ind === baseIndent && /^\s*-\s+/.test(l)) {
+          const r = parseItem(j, baseIndent);
+          if (r) { items.push(r.obj); j = r.next; continue; }
+        }
+        j++;
+      }
+      meta[key] = items.length ? items : '';
+      i = j - 1;
+      continue;
+    }
+
+    meta[key] = /^\[.*\]$/.test(val) ? parseInlineArray(val) : unquote(val);
+  }
+
   return { meta, body: match[2] };
 }
 
@@ -292,6 +393,9 @@ function readRecords(dir, base = '..') {
       // 成长足迹专属字段
       month: meta.month || String(meta.date || nameBase).slice(0, 7),
       monthCn: monthCn(meta.month || meta.date || nameBase),
+      // 行程数据（可选）：front-matter 的 map: true + route: 缩进块
+      map: /^(true|yes|1)$/i.test(String(meta.map).trim()),
+      route: Array.isArray(meta.route) ? meta.route : null,
       html: renderMarkdown(body, slug, base),
       bodyRaw: body,
     };
@@ -469,13 +573,18 @@ function main() {
       )
       .join('');
 
+    // 行程页：map: true 时在正文前插入地图 + Day 面板
+    const routeBlock =
+      t.map && t.route && t.route.length ? renderRoutePage(t.route, '..', t.slug) : '';
+
     const html = applyTemplate(tripTpl, {
       title: escapeHtml(t.title),
       date: escapeHtml(t.date),
       location: escapeHtml(t.location),
       tags,
-      content: t.html + renderGallery(t),
+      content: routeBlock + t.html + renderGallery(t),
       photo_count: t.photos.length,
+      route_css: routeBlock ? ROUTE_CSS : '',
       site_title: '生活记录',
     });
     fs.writeFileSync(path.join(OUT_DIR, 'trip', `${t.slug}.html`), html);

@@ -14,7 +14,7 @@
 
 **流程**：改完 → 调用独立 subagent（`Agent` 工具，`subagent_type: general-purpose`）检视 → subagent **只报不改** → 按 P0/P1/P2 分级 → **P0/P1 未清零不得交付、不得提交** → 修完复审直到清零。
 
-**检视必须覆盖**：构建退出码为 0 · 旅行区 7 篇未受影响 · 成长区（若涉及）· 无 `{{}}` 残留 · 无废弃类名残留 · 文档与代码实际状态一致。
+**检视必须覆盖**：构建退出码为 0 · 旅行区 6 篇未受影响 · 成长区（若涉及）· 无 `{{}}` 残留 · 无废弃类名残留 · 文档与代码实际状态一致。
 
 > 审核清单：`.workbuddy/skills/growth-review/SKILL.md`
 >
@@ -112,23 +112,23 @@ life-journal/
 │   ├── 2024-10-02-beijing.md
 │   ├── 2025-03-20-hangzhou.md
 │   ├── 2025-08-08-xiamen.md
-│   ├── 2026-01-01-sample-trip.md
 │   ├── 2026-04-12-chengdu.md
-│   └── 2026-06-08-qinggan-2026.md      ← 78 张照片，最大的一篇
+│   └── 2026-06-08-qinggan-2026.md      ← 78 张照片 + route 行程数据（8 天）
 ├── content/growth/         ← 【成长足迹区】每月一版，女儿小雨的成长相册
 │   ├── 2026-09.md          ← 九月版（江南天池 + 良渚，含数据卡与视频）← 定稿内容
 │   └── _template.md        ← 成长记录模板（序 / 01 / 02 / 小结）
 ├── photos/                 ← 【资源区】按 slug 分目录
 │   ├── beijing/  chengdu/  hangzhou/  qinghai/
 │   ├── qinggan-2026/       ← 78 张
-│   ├── sample-trip/  xiamen/
+│   └── xiamen/
 │   └── 2026-09/            ← 九月版照片 10 张 + 视频 1 段 + 视频封面
 ├── templates/              ← 【模板区】HTML 骨架
 │   ├── index.html          ← 首页（页签切换 + 旅程筛选 + 成长时间轴）
 │   ├── trip.html           ← 旅行详情页（含灯箱）
 │   └── growth.html         ← 成长记录详情页（含灯箱）
 ├── scripts/
-│   ├── build.js            ← 构建：md → html（旅行 + 成长双通道）
+│   ├── build.js            ← 构建：md → html（旅行 + 成长双通道，含 route 解析）
+│   ├── route-page.js       ← 行程页渲染（地图 + Day 面板 + 景点/美食卡片）
 │   ├── compress-images.js  ← 压缩照片（需 npm i -D sharp）
 │   ├── new-trip.js         ← 一键创建新游记 / 成长记录骨架
 │   └── dev.js              ← 本地预览服务器（8080）
@@ -184,6 +184,8 @@ tags: [旅行, 海边, 冬季]
 | `cover` | ⬜ | 封面图文件名（相对 `photos/<slug>/`），缺省取第一张 |
 | `summary` | ⬜ | 一句话摘要，用于首页卡片 |
 | `tags` | ⬜ | 标签数组 |
+| `map` | ⬜ | `true` 时启用**行程页**（地图 + Day 面板），见第 4.3.1 节 |
+| `route` | ⬜ | 行程数据（缩进块），需配合 `map: true` |
 
 ### 4.2.1 成长记录 Front-matter（成长足迹专用）
 
@@ -231,6 +233,52 @@ cover: liangzhu_01.jpg
 构建时 `photos:001.jpg` 会被替换为 `photos/<slug>/001.jpg`。
 
 - 正文中**不要**写 HTML 的 `<html>/<body>`，只写内容片段。
+
+### 4.3.1 行程数据格式（`map: true` + `route:`）
+
+旅行 md 可选地携带**行程数据**，启用后详情页会渲染成「地图 + Day 切换面板」而非普通图文流。
+数据来源：`https://github.com/SethShen/qinggan-trip` 的 `tripData` 数组（经一次性迁移脚本 `../qinggan-migration-scripts/build-qinggan-route.js` 转成 YAML（脚本已移出仓库，数据已固化进 md））。
+
+```yaml
+map: true
+route:
+  - day: 1
+    date: "6.6"
+    label: "入青"
+    route: "杭州 → 西宁"
+    distance: "~2000km（飞行）"
+    duration: "约3.5小时"
+    summary: "落地休整，西宁租车"
+    marker: [35.6, 102.8]
+    hotel: "汉庭优佳酒店(西宁唐道万达广场店)"
+    spots:
+      - name: "西宁曹家堡国际机场"
+        desc: "落地西宁租车前往酒店。"
+        photos: ["001.jpg"]
+    food:
+      - name: "老三样·土菜馆"
+        desc: "65元双人餐，麻婆豆腐和小炒牛肉。玉米龙骨汤不错。…"  # desc 可长，完整文本见实际文件
+        photos: ["002.jpg", "003.jpg"]
+```
+
+| 字段 | 必填 | 说明 |
+|---|---|---|
+| `day` / `date` / `label` | ✅ | 天序号、日期、主题标签 |
+| `route` / `distance` / `duration` | ⬜ | 当天路线、里程、耗时 |
+| `summary` | ⬜ | 当天概述 |
+| `marker` | ⬜ | `[纬度, 经度]`。**缺失时该天不画地图标记**（静默跳过，不报错） |
+| `hotel` | ⬜ | 住宿。实测 Day5 / Day8 无此字段，渲染时自动省略 |
+| `spots[]` | ⬜ | 景点：`name` / `desc` / `photos[]` |
+| `food[]` | ⬜ | 美食：`name` / `desc` / `photos[]` |
+
+**解析器**：`build.js` 的 `parseFrontMatter()` 已支持**两层缩进的对象数组**（顶层 `route:` → `- day:` → `spots:` / `food:`）。
+`marker: [35.6, 102.8]` 这种纯数字数组会**自动转成数字类型**；含引号或逗号的字符串数组保持字符串。
+
+**渲染**：`scripts/route-page.js` 产出 HTML + CSS，由 `templates/trip.html` 的 `{{route_css}}` 插槽注入。
+地图用 Leaflet CDN（`unpkg.com/leaflet@1.9.4`），**加载失败时自动降级**为纯 Day 面板（显示 `.rt-fallback` 提示），不影响文字与照片。
+
+> ⚠️ **照片编号必须与 `route` 里的 `photos` 对应**。当前 `photos/qinggan-2026/001-078.jpg` 的编号
+> 已按 `route` 里的出现顺序（Day→景点→美食）重排压缩，不是历史编号。
 
 ### 4.4 成长记录文案铁律（八条禁令，最高优先级）
 
@@ -304,7 +352,7 @@ cover: liangzhu_01.jpg
 
 | 通道 | 源目录 | 文件命名 | 详情页路径 | 归属人 |
 |---|---|---|---|---|
-| 旅行 | `content/*.md` | `<date>-<slug>.md` | `trip/<slug>.html` | 本人 |
+| 旅行 | `content/*.md` | `<date>-<slug>.md` | `trip/<slug>.html` | 本人（现有 6 篇） |
 | 成长 | `content/growth/*.md` | `<YYYY-MM>.md` | `growth/<slug>.html` | 女儿（小雨） |
 
 `content/growth/` 不存在时会自动降级为空，**不影响旅行站的构建**。
@@ -506,7 +554,7 @@ article.album-page
 | **远程仓库** | git@github.com:SethShen/life-journal.git（**私有**） |
 | 平台 | GitHub（私有仓库） |
 | 分支 | `main` |
-| 托管方式 | Cloudflare Pages 连GitHub，push 自动构建发布 |
+| 托管方式 | **Cloudflare Workers**（非 Pages），需手动或 CI 触发部署 |
 
 > ⚠️ **历史说明**：2026-10-06 之前本文档曾错误地记为「Gitee 私有仓库」。实际从未使用 Gitee，代码始终托管在 GitHub。该错误已于 2026-10-06 修正。
 
@@ -628,6 +676,8 @@ npm run dev               # 构建 + 本地预览 (http://localhost:8080)
 
 | 日期 | 类型 | 说明 |
 |---|---|---|
+| 2026-10-06 | fix | **修独立审核发现的 P0 与 P1**。① **P0 正文图文错位**：照片重排只更新了 route 一侧，正文 25 处编号未改，导致「牦牛汤配在盐湖小节」等错位；已按「正文小节标题 → route 条目名」（含 ALIAS 映射）修正 13 个小节，并删除重复的「沙州夜市」小节。② 删除 route 里重复的「沙州夜市（D4晚）」条目（与 Day4 同图同内容，致同图在页面出现两次）。③ 修正错字「沙洲夜市」→「沙州夜市」（2 处，敦煌市正确写法为沙州）。④ **P1 XSS**：内嵌 `#rt-data` 的 JSON 未转义，含 `</script>` 会 breakout 且使 `JSON.parse` 崩溃；已加 `<` `>` `&` 转义。⑤ **P1 灯箱**：`templates/trip.html` 选择器漏 `.rt-shots img`，致行程面板 80 张缩略图有放大光标但点击无反应，已补。⑥ `map` 取值放宽为 `/^(true|yes\|1)$/i`。⑦ 移动端断点补 `.rt-card` 内边距与 `.rt-nav` 渐隐。⑧ 文档：目录树删sample-trip、三处「7 篇」改 6 篇、`.codebuddy-memory.md` 统计改为实测值（旅行 6 + 成长 1 篇、7 个目录 99 张 11MB）、第 7 节托管方式纠正为 Workers。⑨ 审核清单新增 **G-11 图片双引用体系**（重排照片必须两侧同步）、G-12、G-13、G-14、P0-6 图文归属一致，并把 G-2 的写死篇数改为「按实际 ls 核对」 |
+| 2026-10-06 | feat | **青甘大环线集成 qinggan-trip 优化详情页**，并**删除旅行区示例**。① 删除 `content/2026-01-01-sample-trip.md` 与 `photos/sample-trip/`（3 张），游记 7 → 6篇。② 从 `github.com/SethShen/qinggan-trip`（SSH 克隆，HTTPS克隆在本机失败）提取 `tripData` 数组（8 天 / 17 景点 / 14 美食 / 78 张图 / 8 个坐标），转为 front-matter 的 `map: true` + `route:` 缩进块；**照片按 route 出现顺序（Day→景点→美食）重排并压缩**（远程原图 50.8MB → 8.5MB，比原来 11MB 更小），编号与 `route.photos` 严格对应，**正文引用已同步重排**（13 个小节修正 + 沙洲夜市去重）。③ `build.js` 的 `parseFrontMatter()` **扩展为支持两层缩进的对象数组**（新增 `unquote` / `parseInlineArray`，纯数字数组自动转数字类型），`readRecords` 返回 `map` / `route`。④ 新增 `scripts/route-page.js`：Leaflet 地图 + 路线折线 + 8 天 Day 切换面板 + 景点/美食卡片 + 酒店 + 图例，**地图加载失败自动降级**为纯 Day 面板；`templates/trip.html` 新增 `{{route_css}}` 插槽。⑤ 新增第 4.3.1 节行程数据格式规范。第 3/4 节已同步 |
 | 2026-10-06 | docs | 补修上条遗留：`build.js:293` 的 `age: meta.age` 与 `new-trip.js:39` 的 `const age = args.age` 两处**死代码**已删（无消费方）；第 8 节「birthdate 必须准确」整行删除（约束已失效）；第 9 节命令去掉 `--birthdate`；第 5.0.1 节「年龄胶囊」改为「当月标签（`.al-tags`）」。审核清单 P1-3 补「不误判首页副标题的 N 个月（记录月数非年龄）」、P1-2 去掉 `birthdate` 以免与 P1-3 互斥、G-3 补「仅搜 *.html」（不限定会误命中二进制）、P2 图说补「成长区以原始 alt 为准，不受 4–8 字限制」 |
 | 2026-10-06 | refactor | **移除成长足迹的年龄标签**：相册卡片副标由「3 岁 6 个月」年龄胶囊改为**当月标签**（取自 front-matter `tags`，渲染为 `div.al-tags > span.al-tag`，九月版为「出行 · 秋天」）；详情页页眉删除 `{{age}}` 只留照片数；九月版数据卡第三项由「3 岁 6 个月 当时年龄」换为「2 个 去了的地方」；`content/growth/*.md` 移除 `birthdate` 字段；**彻底删除** `build.js` 的 `formatAge()` 函数、`birthdate` 字段处理与 `ageText` 变量；`new-trip.js` 同步移除 `--birthdate` 参数与模板字段；`style.css` 的 `.al-age` 改为 `.al-tags`/`.al-tag`。理由：年龄是算出来的数据而非内容本身的信息，每次翻相册重复展示同一串数字无增量。审核清单 P1-3 相应改为「不得出现年龄标签」。第 4.2.1 / 4.5 / 5.0.1 / 5.0.2 节已同步 |
 | 2026-10-06 | docs | **审核义务升级为全项目铁律一**：原「文档同步义务」改编号为铁律二，新增铁律一「任何代码改动都必须经独立 agent 检视」。`AGENTS.md` 同步新增铁律一（含适用范围表 7 步流程）；审核清单 `.workbuddy/skills/growth-review/SKILL.md` 从成长区专项扩展为全项目通用（新增 **G-1~G-10 通用必查**：构建退出码 / 旅行区未受影响 / 无 `{{}}` 残留 / 脚手架同步 / 新语法入文档 / 模板变量语法合法等）；第 3 节目录树与文末速查表补 `.workbuddy/`。**经两轮独立审核修 8 项 P1**（铁律一自身首轮即被报 4 项）：文档写的 safe-delete 绕法无效（逐项 unlink 无法绕过，阈值按整个 turn 累计计算）→ 改为实测有效的 `CODEBUDDY_SAFE_DELETE_BULK_THRESHOLD=100000`；执行顺序悖论（先送审后补日志导致 G-7 首轮必挂，且 G-6 同构）→ 改为「先补日志+同步受影响章节，再送审」；关闭自我豁免后门（规则文件本身一律不豁免）；豁免收窄为「纯措辞」；删除 `build.js` 里`timelineYears`/`timeline_years` 死代码（成长区改月刊后模板已无此占位）；统一部署口径为 Workers（技术栈表与数据流图不再写「Pages 自动构建」）；`birthdate` 示例旧值 `2024-05-20` → `2023-03-16`（第 9 节命令与 `new-trip.js` 两处）；「成长区专项」补归属说明；文末速查表补 `content/growth/` 与 `.workbuddy/` |
