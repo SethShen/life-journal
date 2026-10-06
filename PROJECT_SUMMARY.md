@@ -14,7 +14,7 @@
 
 **流程**：改完 → 调用独立 subagent（`Agent` 工具，`subagent_type: general-purpose`）检视 → subagent **只报不改** → 按 P0/P1/P2 分级 → **P0/P1 未清零不得交付、不得提交** → 修完复审直到清零。
 
-**检视必须覆盖**：构建退出码为 0 · 旅行区 6 篇未受影响 · 成长区（若涉及）· 无 `{{}}` 残留 · 无废弃类名残留 · 文档与代码实际状态一致。
+**检视必须覆盖**：构建退出码为 0 · 旅行区 1 篇未受影响 · 成长区（若涉及）· 无 `{{}}` 残留 · 无废弃类名残留 · 文档与代码实际状态一致。
 
 > 审核清单：`.workbuddy/skills/growth-review/SKILL.md`
 >
@@ -108,19 +108,12 @@ life-journal/
 ├── package.json            ← 脚本入口（build / dev / new / compress）
 ├── content/                ← 【旅行游记区】
 │   ├── _template.md        ← 新游记模板
-│   ├── 2024-07-15-qinghai.md
-│   ├── 2024-10-02-beijing.md
-│   ├── 2025-03-20-hangzhou.md
-│   ├── 2025-08-08-xiamen.md
-│   ├── 2026-04-12-chengdu.md
 │   └── 2026-06-08-qinggan-2026.md      ← 78 张照片 + route 行程数据（8 天）
 ├── content/growth/         ← 【成长足迹区】每月一版，女儿小雨的成长相册
 │   ├── 2026-09.md          ← 九月版（江南天池 + 良渚，含数据卡与视频）← 定稿内容
 │   └── _template.md        ← 成长记录模板（序 / 01 / 02 / 小结）
 ├── photos/                 ← 【资源区】按 slug 分目录
-│   ├── beijing/  chengdu/  hangzhou/  qinghai/
 │   ├── qinggan-2026/       ← 78 张
-│   └── xiamen/
 │   └── 2026-09/            ← 九月版照片 10 张 + 视频 1 段 + 视频封面
 ├── templates/              ← 【模板区】HTML 骨架
 │   ├── index.html          ← 首页（页签切换 + 旅程筛选 + 成长时间轴）
@@ -133,7 +126,8 @@ life-journal/
 │   ├── new-trip.js         ← 一键创建新游记 / 成长记录骨架
 │   └── dev.js              ← 本地预览服务器（8080）
 ├── src/
-│   └── style.css           ← 全站样式（CSS 变量集中配色，含深色模式）
+│   ├── style.css           ← 全站样式（CSS 变量集中配色，含深色模式）
+│   └── vendor/leaflet/     ← Leaflet 1.9.4 本地副本（js/css/images，约 165KB）
 ├── .workbuddy/skills/growth-review/
 │   └── SKILL.md            ← 【强制审核清单】G-1~G-10 + 成长区专项 + 文案八条禁令
 ├── public/                 ← 构建产物（.gitignore 已忽略，不提交）
@@ -275,7 +269,16 @@ route:
 `marker: [35.6, 102.8]` 这种纯数字数组会**自动转成数字类型**；含引号或逗号的字符串数组保持字符串。
 
 **渲染**：`scripts/route-page.js` 产出 HTML + CSS，由 `templates/trip.html` 的 `{{route_css}}` 插槽注入。
-地图用 Leaflet CDN（`unpkg.com/leaflet@1.9.4`），**加载失败时自动降级**为纯 Day 面板（显示 `.rt-fallback` 提示），不影响文字与照片。
+
+**地图依赖（重要）**：
+- **Leaflet 已本地化**在 `src/vendor/leaflet/`（js + css + images，约 165KB），`build.js` 会复制到 `public/vendor/`。
+  **不使用 CDN** —— 早期版本用 `unpkg.com` 且**漏了 leaflet.css**，导致地图瓦片错位成空白。
+- **瓦片源用高德**（`webrd0{1-4}.is.autonavi.com`）。实测 **CARTO 与 OpenStreetMap 在本机不可达（HTTP 000，被墙）**，
+  用它们会导致地图全白。高德实测 200 可达且中文标注更适合国内行程。
+- ⚠️ 高德瓦片是 **GCJ-02** 坐标系，而 `route.marker` 是 WGS-84。本行程跨青海湖→敦煌约 1000 公里，
+  **~500 米的偏移在此缩放下不可见**，故未做坐标转换。若将来做城市级小范围地图，需先转 GCJ-02。
+- **加载失败自动降级**（三种分支）：① Leaflet 未加载（`typeof L === 'undefined'`）② 无有效 marker（`pts.length === 0`）
+  ③ 初始化抛异常（`catch`）。三种都会显示 `.rt-fallback` 提示，文字与照片不受影响。
 
 > ⚠️ **照片编号必须与 `route` 里的 `photos` 对应**。当前 `photos/qinggan-2026/001-078.jpg` 的编号
 > 已按 `route` 里的出现顺序（Day→景点→美食）重排压缩，不是历史编号。
@@ -343,6 +346,7 @@ route:
 | `public/growth/<slug>.html` | 成长 md → 成长详情页 |
 | `public/photos/**` | 从 `photos/` 复制 |
 | `public/style.css` | 从 `src/style.css` 复制 |
+| `public/vendor/**` | 从 `src/vendor/` 复制（Leaflet 本地副本，行程页地图用） |
 
 构建脚本特点：**零第三方依赖**，只用 Node 内置模块（`fs`/`path`）。这样在任何环境都能跑，不会因 npm 挂掉而失效。
 
@@ -352,7 +356,7 @@ route:
 
 | 通道 | 源目录 | 文件命名 | 详情页路径 | 归属人 |
 |---|---|---|---|---|
-| 旅行 | `content/*.md` | `<date>-<slug>.md` | `trip/<slug>.html` | 本人（现有 6 篇） |
+| 旅行 | `content/*.md` | `<date>-<slug>.md` | `trip/<slug>.html` | 本人（现有 1 篇） |
 | 成长 | `content/growth/*.md` | `<YYYY-MM>.md` | `growth/<slug>.html` | 女儿（小雨） |
 
 `content/growth/` 不存在时会自动降级为空，**不影响旅行站的构建**。
@@ -676,6 +680,7 @@ npm run dev               # 构建 + 本地预览 (http://localhost:8080)
 
 | 日期 | 类型 | 说明 |
 |---|---|---|
+| 2026-10-06 | fix | **删除旅行区 5 篇示例 + 修复行程页地图 + 去掉多余总览**。① 删除 `2024-07-15-qinghai` / `2024-10-02-beijing` / `2025-03-20-hangzhou` / `2025-08-08-xiamen` / `2026-04-12-chengdu` 五篇**种子示例**（正文均为「这里写下当天的经历」占位文案）及对应照片目录，旅行区现仅剩青甘 1 篇（+`_template`）。② **修复地图不显示** —— 两个 bug 叠加：**漏加载 `leaflet.css`**（只引了 js，瓦片错位成空白）+ **瓦片源不可达**（CARTO/OSM 实测 HTTP 000 被墙）。已把 Leaflet **本地化**到 `src/vendor/leaflet/`（js/css/images 178KB，`build.js` 复制到 `public/vendor/`）并改用**高德瓦片**（实测 200、中文标注）。③ 删除青甘正文开头的**「行程总览」6 行表格**（Day 面板已展示每天的路线与住宿，重复），保留引言与「花费小结」。第 0/3/4/5 节、`AGENTS.md`、`.codebuddy-memory.md` 均已同步计数 |
 | 2026-10-06 | fix | **修独立审核发现的 P0 与 P1**。① **P0 正文图文错位**：照片重排只更新了 route 一侧，正文 25 处编号未改，导致「牦牛汤配在盐湖小节」等错位；已按「正文小节标题 → route 条目名」（含 ALIAS 映射）修正 13 个小节，并删除重复的「沙州夜市」小节。② 删除 route 里重复的「沙州夜市（D4晚）」条目（与 Day4 同图同内容，致同图在页面出现两次）。③ 修正错字「沙洲夜市」→「沙州夜市」（2 处，敦煌市正确写法为沙州）。④ **P1 XSS**：内嵌 `#rt-data` 的 JSON 未转义，含 `</script>` 会 breakout 且使 `JSON.parse` 崩溃；已加 `<` `>` `&` 转义。⑤ **P1 灯箱**：`templates/trip.html` 选择器漏 `.rt-shots img`，致行程面板 80 张缩略图有放大光标但点击无反应，已补。⑥ `map` 取值放宽为 `/^(true|yes\|1)$/i`。⑦ 移动端断点补 `.rt-card` 内边距与 `.rt-nav` 渐隐。⑧ 文档：目录树删sample-trip、三处「7 篇」改 6 篇、`.codebuddy-memory.md` 统计改为实测值（旅行 6 + 成长 1 篇、7 个目录 99 张 11MB）、第 7 节托管方式纠正为 Workers。⑨ 审核清单新增 **G-11 图片双引用体系**（重排照片必须两侧同步）、G-12、G-13、G-14、P0-6 图文归属一致，并把 G-2 的写死篇数改为「按实际 ls 核对」 |
 | 2026-10-06 | feat | **青甘大环线集成 qinggan-trip 优化详情页**，并**删除旅行区示例**。① 删除 `content/2026-01-01-sample-trip.md` 与 `photos/sample-trip/`（3 张），游记 7 → 6篇。② 从 `github.com/SethShen/qinggan-trip`（SSH 克隆，HTTPS克隆在本机失败）提取 `tripData` 数组（8 天 / 17 景点 / 14 美食 / 78 张图 / 8 个坐标），转为 front-matter 的 `map: true` + `route:` 缩进块；**照片按 route 出现顺序（Day→景点→美食）重排并压缩**（远程原图 50.8MB → 8.5MB，比原来 11MB 更小），编号与 `route.photos` 严格对应，**正文引用已同步重排**（13 个小节修正 + 沙洲夜市去重）。③ `build.js` 的 `parseFrontMatter()` **扩展为支持两层缩进的对象数组**（新增 `unquote` / `parseInlineArray`，纯数字数组自动转数字类型），`readRecords` 返回 `map` / `route`。④ 新增 `scripts/route-page.js`：Leaflet 地图 + 路线折线 + 8 天 Day 切换面板 + 景点/美食卡片 + 酒店 + 图例，**地图加载失败自动降级**为纯 Day 面板；`templates/trip.html` 新增 `{{route_css}}` 插槽。⑤ 新增第 4.3.1 节行程数据格式规范。第 3/4 节已同步 |
 | 2026-10-06 | docs | 补修上条遗留：`build.js:293` 的 `age: meta.age` 与 `new-trip.js:39` 的 `const age = args.age` 两处**死代码**已删（无消费方）；第 8 节「birthdate 必须准确」整行删除（约束已失效）；第 9 节命令去掉 `--birthdate`；第 5.0.1 节「年龄胶囊」改为「当月标签（`.al-tags`）」。审核清单 P1-3 补「不误判首页副标题的 N 个月（记录月数非年龄）」、P1-2 去掉 `birthdate` 以免与 P1-3 互斥、G-3 补「仅搜 *.html」（不限定会误命中二进制）、P2 图说补「成长区以原始 alt 为准，不受 4–8 字限制」 |
@@ -709,6 +714,7 @@ photos/          照片，按 slug 分目录（常改）
 templates/    HTML 骨架（改版式时）
 src/style.css 全站样式（改外观时）
 scripts/      构建/压缩/新建/预览脚本
+src/vendor/leaflet/  Leaflet 本地副本（行程页地图用）
 public/       构建产物（不提交）
 .workbuddy/skills/growth-review/  强制审核清单（改动后必审）
 ```

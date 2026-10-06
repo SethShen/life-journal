@@ -620,6 +620,8 @@ function main() {
 
   // ---- 复制资源 ----
   copyDir(PHOTOS_DIR, path.join(OUT_DIR, 'photos'));
+  // 第三方静态资源（Leaflet）→ public/vendor/，供行程页地图使用
+  copyDir(path.join(SRC_DIR, 'vendor'), path.join(OUT_DIR, 'vendor'));
   if (fs.existsSync(path.join(SRC_DIR, 'style.css'))) {
     fs.copyFileSync(path.join(SRC_DIR, 'style.css'), path.join(OUT_DIR, 'style.css'));
   }

@@ -3,13 +3,14 @@
  *
  * 当 front-matter 含 `map: true` 与 `route:` 时，由 build.js 调用。
  * 产出：地图容器 + 路线图例 + 8 天 Day 切换面板（景点/美食/酒店卡片）。
- * 依赖 Leaflet（CDN），地图失败时降级为纯 Day 面板。
+ * 依赖**本地** Leaflet（src/vendor/leaflet/，经 build.js 复制到 public/vendor/），
+ * 瓦片用高德（CARTO/OSM 在国内不可达）。地图失败时降级为纯 Day 面板。
  */
 
 /** 行程页所需的 CSS（注入到页面 <style> 里） */
 const ROUTE_CSS = `
 .rt-map{position:relative;height:420px;border-radius:14px;overflow:hidden;margin:28px 0 12px;background:var(--al-green-soft,#eaf0e7);border:1px solid var(--border,#ece7e0)}
-.rt-map canvas,.rt-map .leaflet-container{width:100%;height:100%}
+.rt-map.leaflet-container{width:100%;height:100%}
 .rt-legend{display:flex;flex-wrap:wrap;gap:14px;margin-bottom:24px;font-size:12px;color:var(--text-muted,#8a8178)}
 .rt-legend span{display:inline-flex;align-items:center;gap:5px}
 .rt-dot{width:9px;height:9px;border-radius:50%;display:inline-block}
@@ -136,7 +137,8 @@ function renderRoutePage(route, base, slug) {
 <nav class="rt-nav" id="rt-nav">${nav}</nav>
 ${panels}
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="stylesheet" href="${prefix}vendor/leaflet/leaflet.css">
+<script src="${prefix}vendor/leaflet/leaflet.js"></script>
 <script id="rt-data" type="application/json">${JSON.stringify(mapData)
     .replace(/</g, '\\u003c')
     .replace(/>/g, '\\u003e')
@@ -161,8 +163,11 @@ ${panels}
   if (typeof L === 'undefined') { fb.hidden = false; return; }
   try {
     var map = L.map('rt-map', { scrollWheelZoom: false });
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-      maxZoom: 18, attribution: '&copy; OpenStreetMap &copy; CARTO',
+    // 高德路网瓦片：国内可达；CARTO / OSM 在本机实测不可达（被墙）
+    L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}', {
+      subdomains: '1234',
+      maxZoom: 18,
+      attribution: '&copy; 高德地图',
     }).addTo(map);
 
     var pts = days.filter(function (d) { return Array.isArray(d.marker) && d.marker.length === 2; });
