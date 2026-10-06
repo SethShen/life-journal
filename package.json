@@ -1,0 +1,16 @@
+{
+  "name": "life-journal",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Git 即 CMS 的个人生活/旅行记录静态站",
+  "scripts": {
+    "build": "node scripts/build.js",
+    "dev": "node scripts/dev.js",
+    "new": "node scripts/new-trip.js",
+    "compress": "node scripts/compress-images.js"
+  },
+  "devDependencies": {},
+  "engines": {
+    "node": ">=18"
+  }
+}

@@ -1,0 +1,360 @@
+# PROJECT SUMMARY — Life Journal
+
+> **给 AI 助手的入口文档。**
+> 如果你（AI）被要求修改、扩展或维护这个项目，请先完整读完本文，再动手。
+> 本文档是项目的唯一权威说明，优先级高于任何零散注释。
+
+---
+
+## ⚠️ 第 0 条：文档同步义务（最高优先级，先读这条）
+
+**任何一次对项目的改动，都必须同步更新本文档。**
+
+这不是"建议"，是**必须执行的收尾步骤**。具体要求：
+
+1. **改代码前**：先读本文档，确认理解现有架构与约束。
+2. **改代码后，提交前**：检查本文档是否需要同步修改。需要同步的内容包括但不限于：
+   - 新增/删除/重命名**文件或目录** → 更新第 3 节「目录结构」
+   - 新增/修改**构建逻辑、脚本命令** → 更新第 5 节、第 9 节
+   - 新增/修改**功能**（筛选、排序、地图等）→ 在该功能对应章节补充说明
+   - 修改**内容格式规范**（front-matter 字段、图片语法）→ 更新第 4 节
+   - 修改**部署方式** → 更新第 7 节
+   - 新增**已知坑或约束** → 更新第 8 节
+3. **每次改动**：在文末第 11 节「变更日志」**追加一条记录**（日期 + 改了什么 + 为什么）。
+4. **交付前自检**：确认本文档描述的内容与仓库**实际状态一致**。文档过期等同于 bug。
+
+> **判断标准**：如果一个新的 AI 读了本文档后，据此操作会出错或困惑，说明本文档没更新到位。
+
+---
+
+## 1. 这是什么
+
+一个**个人生活/旅行记录网站**，核心特征：
+
+- **内容是「出游一次 → 更新一次」**，不是后台手动新建
+- **更新方式是提交代码**（Git 工作流），不是 CMS 后台
+- **由 AI 协助生成内容**：用户口述 + 丢照片，AI 生成游记 Markdown
+- **照片存放在代码仓库**里，随内容一起版本化
+
+一句话：**Git 就是数据库，Markdown 就是内容，push 就是发布。**
+
+---
+
+## 2. 技术栈与架构
+
+| 层 | 选型 | 说明 |
+|---|---|---|
+| 内容源 | Markdown（`content/*.md`） | 每次出游一个文件 |
+| 资源 | 照片（`photos/<slug>/*.jpg`） | 压缩后提交 |
+| 构建 | Node.js 脚本（`scripts/build.js`） | md + 照片 → 静态 HTML |
+| 输出 | `public/` | 构建产物，**不提交到 git** |
+| 托管 | GitHub 仓库（私有） | 存代码与照片 |
+| 部署 | Cloudflare Pages | 连 GitHub，push 自动构建发布 |
+| 样式 | 原生 CSS（无框架） | 零依赖，好维护 |
+
+### 数据流
+
+```
+content/*.md  +  photos/**  +  templates/**
+                    │
+                    ▼
+        scripts/build.js  (Node, 无第三方依赖)
+                    │
+                    ▼
+              public/*.html  +  public/photos/**
+                    │
+                    ▼
+   Cloudflare Pages 自动构建 → https://xxx.pages.dev
+```
+
+---
+
+## 3. 目录结构
+
+```
+life-journal/
+├── PROJECT_SUMMARY.md      ← 本文档（AI 入口，唯一权威）
+├── AGENTS.md               ← AI 工作约定（强制同步本文档）
+├── DEPLOY.md               ← 部署与更新指引
+├── .codebuddy-memory.md    ← 项目持久化记忆
+├── README.md               ← 给人看的使用说明
+├── package.json            ← 脚本入口（build / dev / new / compress）
+├── content/                ← 【内容区】每篇游记一个 md
+│   ├── _template.md        ← 新游记模板
+│   └── 2026-01-01-sample-trip.md
+├── photos/                 ← 【资源区】按 slug 分目录
+│   └── sample-trip/
+│       ├── 001.jpg
+│       └── 002.jpg
+├── templates/              ← 【模板区】HTML 骨架
+│   ├── index.html          ← 首页（含筛选栏与筛选脚本）
+│   └── trip.html           ← 详情页
+├── scripts/
+│   ├── build.js            ← 构建：md → html（含筛选数据注入）
+│   ├── compress-images.js  ← 压缩照片
+│   ├── new-trip.js         ← 一键创建新游记骨架
+│   └── dev.js              ← 本地预览服务器
+├── src/
+│   └── style.css           ← 全站样式（CSS 变量集中配色）
+├── screenshots/            ← 效果图（可删）
+└── .github/workflows/
+    └── deploy.yml          ← GitHub Pages 部署（Cloudflare 备选方案）
+```
+
+---
+
+## 4. 内容格式规范（AI 必读）
+
+### 4.1 文件命名
+
+```
+content/YYYY-MM-DD-slug.md
+```
+
+- `YYYY-MM-DD`：出游**开始**日期，决定时间线排序
+- `slug`：英文短横线，**必须与 `photos/<slug>/` 目录名一致**
+
+### 4.2 Front-matter（YAML 头）
+
+每篇 md **必须**以以下头部开始：
+
+```yaml
+---
+title: 三亚三日
+date: 2026-01-01
+location: 海南·三亚
+slug: sanya-2026
+cover: 001.jpg
+summary: 第一次冬天去看海，风很大，心很静。
+tags: [旅行, 海边, 冬季]
+---
+```
+
+| 字段 | 必填 | 说明 |
+|---|---|---|
+| `title` | ✅ | 标题 |
+| `date` | ✅ | 起始日期，ISO 格式 |
+| `location` | ✅ | 地点，显示在卡片上 |
+| `slug` | ✅ | 唯一标识，**等于照片目录名** |
+| `cover` | ⬜ | 封面图文件名（相对 `photos/<slug>/`），缺省取第一张 |
+| `summary` | ⬜ | 一句话摘要，用于首页卡片 |
+| `tags` | ⬜ | 标签数组 |
+
+### 4.3 正文
+
+- 用标准 Markdown
+- **插图语法**（自定义）：
+
+```markdown
+![描述文字](photos:001.jpg)
+```
+
+构建时 `photos:001.jpg` 会被替换为 `photos/<slug>/001.jpg`。
+
+- 正文中**不要**写 HTML 的 `<html>/<body>`，只写内容片段。
+
+---
+
+## 5. 构建产物说明
+
+`scripts/build.js` 生成：
+
+| 输出 | 来源 |
+|---|---|
+| `public/index.html` | 所有 md 按 date 倒序 → 卡片墙 + 筛选栏 |
+| `public/trip/<slug>.html` | 单篇 md → 详情页 |
+| `public/photos/**` | 从 `photos/` 复制 |
+| `public/style.css` | 从 `src/style.css` 复制 |
+
+构建脚本特点：**零第三方依赖**，只用 Node 内置模块（`fs`/`path`）。这样在任何环境都能跑，不会因 npm 挂掉而失效。
+
+### 5.1 筛选功能（前端实现，无需重新构建）
+
+首页内嵌一段原生 JS，支持三种筛选方式，**可叠加**：
+
+| 维度 | 交互 | URL 参数 |
+|---|---|---|
+| 标签 | 点标签 chip，或点卡片上的标签 | `?tag=海边` |
+| 年份 | 点时间 chip | `?year=2026` |
+| 关键词 | 搜索框（防抖 180ms），匹配标题/地点/摘要/标签 | `?q=成都` |
+
+**实现机制：**
+
+- 构建时给每张卡片注入 `data-tags` / `data-year` / `data-month` / `data-search` 属性
+- 筛选时用 JS 切换卡片的 `hidden` 属性（`display: none`），**不重新请求页面**
+- 标签与年份 chip 由构建脚本按**出现频次倒序**生成，并显示计数
+- 筛选状态实时同步到 URL（`history.replaceState`），**可分享、可收藏**
+- 详情页的标签是 `<a href="../index.html?tag=xxx">`，点击跳回首页并自动筛选
+- 无结果时显示空状态，提供「清除筛选」
+
+**加筛选维度时**：在 `build.js` 的卡片模板里加 `data-xxx`，再在 `templates/index.html` 的脚本里加一条判断即可。
+
+### 5.2 Markdown 渲染能力（自研解析器）
+
+`build.js` 内的 `renderMarkdown()` 是个**手写的极简 Markdown 解析器**（零依赖）。当前支持：
+
+| 语法 | 说明 |
+|---|---|
+| `#` / `##` / `###` | 标题 |
+| `**粗体**` / `*斜体*` / `` `代码` `` | 行内格式 |
+| `> 引用` | 引用块 |
+| `- 列表` | 无序列表 |
+| `[文字](链接)` | 超链接 |
+| `![alt](url)` | 普通图片 |
+| `![alt](photos:文件名)` | **自定义语法**，自动补全为 `photos/<slug>/文件名` |
+| `\| 表格 \|` | 表格（含表头，自动包 `.table-wrap` 支持横向滚动） |
+
+> **改 Markdown 语法支持时**：必须同步更新本表。
+
+### 5.3 详情页照片策略
+
+- **正文中已引用的照片**：就近渲染为 `<figure class="photo">`（带图注）
+- **未被正文引用的照片**：自动归入底部「其余照片」九宫格
+- 构建脚本通过正则 `photos:(\S+)` 扫描正文，得出「已引用集合」，再取差集
+- **点击任意图片 → 全屏灯箱**：支持左右切换、键盘 `←/→/Esc`、显示 `当前/总数`
+
+### 5.4 页面脚本
+
+| 页面 | 内联脚本功能 |
+|---|---|
+| `index.html` | 三向筛选（标签/年份/关键词）、URL 同步、空状态 |
+| `trip.html` | 图片灯箱（放大、切换、键盘操作） |
+
+均**无外部 JS 依赖**，原生实现。
+
+---
+
+## 6. 用户更新流程（最重要）
+
+用户**不需要**懂代码。标准流程：
+
+```
+1. 把这次出游的照片放进 photos/<新slug>/
+2. 对 AI 说："我去了XX，照片在 photos/XX/，帮我加一篇"
+3. AI：
+     a. 运行 npm run new -- --slug XX --title "..." --date ... --location "..."
+     b. 编辑 content/<date>-XX.md，按用户口述补全正文与 front-matter
+     c. 运行 npm run compress   （压缩照片）
+     d. 本地 npm run build 验证
+     e. **核对 PROJECT_SUMMARY.md 是否需要同步更新**（见第 0 条）
+     f. 若本次有结构性改动，在第 11 节「变更日志」追加记录
+     g. git add / commit / push
+4. Cloudflare 自动构建 → 1 分钟内线上更新
+```
+
+> **注意**：如果只是**新增一篇游记内容**（不改代码、不改结构），通常不需要改本文档，
+> 但仍需在第 11 节追加一行「新增游记」记录，保持内容台账完整。
+> 但凡**动了代码、脚本、模板、样式、目录结构**，就**必须**同步更新对应章节。
+
+### AI 执行时的硬性规则
+
+1. **每次只新增一个 `content/<slug>.md`**，不要改动其他已存在的 md。
+2. **不要删除、重命名已有文章**，除非用户明确要求。
+3. **slug 一旦确定不可变**（它同时是照片目录名和 URL）。
+4. 提交前**必须**跑一次 `npm run build`，确认无报错、`public/index.html` 里能看到新条目。
+5. commit message 格式：`add trip: <title> (<date>)`（新增游记）或 `<type>: <描述>`（代码改动）。
+6. 照片**必须先压缩**再提交，否则仓库会迅速膨胀。
+7. **提交前必须检查本文档是否同步**（见第 0 条），并更新第 11 节变更日志。
+
+---
+
+## 7. 部署说明
+
+### 仓库信息
+
+| 项 | 值 |
+|---|---|
+| **远程仓库** | https://gitee.com/seth_shen/life-journal （**私有**） |
+| 平台 | Gitee（国内可直连；GitHub 在本项目开发环境中不可达） |
+| 分支 | `main` |
+
+### 方案 A：Gitee Pages
+
+需**实名认证**，且为**手动部署**（改完要手动点"更新"）。
+
+1. https://gitee.com/seth_shen/life-journal/pages
+2. 完成实名认证
+3. 部署分支选 `master`（Gitee Pages 传统上只认此分支）
+4. 点「启动」/「更新」
+
+### 方案 B：Cloudflare Pages（推荐，自动部署）
+
+支持连接 Gitee 仓库，push 后自动构建。
+
+1. https://dash.cloudflare.com/ → Workers & Pages → Create
+2. 选 Pages → Connect to Git → 授权 Gitee → 选 `life-journal`
+3. 构建配置：
+   - Build command: `npm run build`
+   - Build output directory: `public`
+4. Save and Deploy
+
+之后每次 push 自动重新部署。
+
+### 方案 C：GitHub Pages（备选）
+
+`.github/workflows/deploy.yml` 已就绪，但那需要能访问 GitHub。
+
+> 完整操作步骤见 `DEPLOY.md`。
+
+---
+
+## 8. 已知约束与坑
+
+| 约束 | 说明 | 应对 |
+|---|---|---|
+| 仓库体积 | git 历史永久保留大文件 | 提交前压缩照片；不要反复删传 |
+| 单文件上限 | GitHub 单文件 100MB | 压缩后远低于此 |
+| Pages 公开性 | 生成的网址知道链接即可访问 | 敏感照片不要上传，或加访问控制 |
+| `.gitignore` | `public/` 和 `node_modules/` 必须忽略 | 已配置 |
+| 国内访问 | `pages.dev` 偶尔波动 | 可绑定自有域名 |
+
+---
+
+## 9. 常用命令
+
+```bash
+npm run new -- --slug sanya --title "三亚三日" --date 2026-01-01 --location "海南·三亚"
+npm run compress          # 压缩 photos/ 下所有图片
+npm run build             # 生成 public/
+npm run dev               # 构建 + 本地预览 (http://localhost:8080)
+```
+
+---
+
+## 10. 给 AI 的一句话交接
+
+> 这是「Git 即 CMS」的静态生活记录站。内容是 `content/*.md`，照片是 `photos/<slug>/`，
+> 构建是 `scripts/build.js`（零依赖），部署靠 Cloudflare Pages 自动。
+> **加一篇新游记 = 新增一个 md + 一个照片目录 + push**。改样式只动 `src/style.css` 和 `templates/`。
+> **改完任何东西，记得回来更新本文档。**
+
+---
+
+## 11. 变更日志
+
+> **规则**：每次改动都在此**追加**一行（不要删除历史记录）。新记录写在**最上面**。
+> 格式：`日期 | 类型 | 说明`
+
+| 日期 | 类型 | 说明 |
+|---|---|---|
+| 2026-10-06 | chore | **仓库托管切换至 Gitee**（`gitee.com/seth_shen/life-journal`，私有），因开发环境无法访问 GitHub；新增 `DEPLOY.md` 部署指引；第 7 节重写 |
+| 2026-10-01 | content | 集成**青甘大环线六日自驾**游记（`2026-06-08-qinggan-2026.md`）：37 个站点、78 张照片（压缩后 9.8MB），原文一字未改，按 Day1-6 分章节 |
+| 2026-10-01 | feat | Markdown 解析器新增**表格支持**；详情页新增**灯箱**（全屏放大/切换/键盘操作）；照片改为「正文引用优先、其余进底册」策略；详情页头部显示照片总数 |
+| 2026-10-01 | docs | 新增 `AGENTS.md`（AI 工作约定）与 `.codebuddy-memory.md`（项目记忆）；第 3 节目录结构补充 AGENTS.md / screenshots / dev.js；确立「每次更新必须同步本文档」为强制约定 |
+| 2026-10-01 | docs | 增加第 0 条「文档同步义务」，明确每次改动必须同步本文档；新增第 11 节变更日志；在用户更新流程中加入文档维护步骤 |
+| 2026-10-01 | feat | 新增标签过滤、年份筛选、关键词搜索（纯前端，URL 可分享）；标签/年份 chip 按频次排序并显示计数；详情页标签改为可点击跳转筛选 |
+| 2026-10-01 | feat | 项目初始化：Git-as-CMS 静态站点骨架，含构建脚本、图片压缩、一键建游记、本地预览、Cloudflare/GitHub Pages 部署配置 |
+
+---
+
+## 附：目录结构速查（与第 3 节一致，供快速参考）
+
+```
+content/      每篇游记一个 md（常改）
+photos/       照片，按 slug 分目录（常改）
+templates/    HTML 骨架（改版式时）
+src/style.css 全站样式（改外观时）
+scripts/      构建/压缩/新建/预览脚本
+public/       构建产物（不提交）
+```
+

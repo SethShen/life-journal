@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{site_title}}</title>
+<meta name="description" content="记录每一次出发">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="wrap">
+    <h1 class="site-title">{{site_title}}</h1>
+    <p class="site-sub">共 <span id="total-count">{{count}}</span> 段旅程 · 更新于 {{updated}}</p>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- 筛选栏 -->
+  <section class="filters" id="filters">
+    <div class="filter-row">
+      <input type="search" id="search" class="search-input" placeholder="搜索标题、地点、内容…" autocomplete="off">
+      <button class="clear-btn" type="button" id="clear-all" hidden>清除筛选</button>
+    </div>
+
+    <div class="filter-row filter-row--chips">
+      <span class="filter-label">时间</span>
+      <div class="chips" id="year-chips">
+        <button class="chip chip--all is-active" type="button" data-filter-year="">全部</button>
+        {{year_filters}}
+      </div>
+    </div>
+
+    <div class="filter-row filter-row--chips">
+      <span class="filter-label">标签</span>
+      <div class="chips" id="tag-chips">
+        <button class="chip chip--all is-active" type="button" data-filter-tag="">全部</button>
+        {{tag_filters}}
+      </div>
+    </div>
+  </section>
+
+  <!-- 结果计数 -->
+  <p class="result-count" id="result-count" hidden></p>
+
+  <!-- 卡片 -->
+  <div class="grid" id="grid">
+    {{cards}}
+  </div>
+
+  <!-- 空状态 -->
+  <div class="empty-state" id="empty-state" hidden>
+    <div class="empty-icon">✦</div>
+    <p>没有符合条件的记录</p>
+    <button class="clear-btn" type="button" id="clear-empty">清除筛选</button>
+  </div>
+
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <p>用 Git 记录生活 · Powered by Cloudflare Pages</p>
+  </div>
+</footer>
+
+<script>
+(function () {
+  var grid = document.getElementById('grid');
+  var cards = Array.prototype.slice.call(grid.querySelectorAll('.card'));
+  var searchInput = document.getElementById('search');
+  var resultCount = document.getElementById('result-count');
+  var emptyState = document.getElementById('empty-state');
+  var clearAll = document.getElementById('clear-all');
+  var clearEmpty = document.getElementById('clear-empty');
+
+  var state = { tag: '', year: '', q: '' };
+
+  // 从 URL 读取初始筛选
+  var params = new URLSearchParams(location.search);
+  if (params.get('tag')) state.tag = params.get('tag');
+  if (params.get('year')) state.year = params.get('year');
+  if (params.get('q')) state.q = params.get('q');
+
+  // 预读卡片的筛选属性
+  cards.forEach(function (card) {
+    try {
+      card._tags = JSON.parse(card.dataset.tags || '[]');
+    } catch (e) {
+      card._tags = [];
+    }
+    card._tagStr = card._tags.join('\u0000');
+    card._year = card.dataset.year || '';
+    card._search = card.dataset.search || '';
+  });
+
+  function apply() {
+    var q = state.q.trim().toLowerCase();
+    var visible = 0;
+
+    cards.forEach(function (card) {
+      var ok = true;
+      if (state.tag && card._tagStr.indexOf(state.tag) === -1) ok = false;
+      if (ok && state.year && card._year !== state.year) ok = false;
+      if (ok && q && card._search.indexOf(q) === -1) ok = false;
+
+      card.hidden = !ok;
+      if (ok) visible++;
+    });
+
+    // 计数
+    var filtering = state.tag || state.year || q;
+    resultCount.hidden = !filtering;
+    if (filtering) {
+      resultCount.textContent = '找到 ' + visible + ' 条记录';
+    }
+
+    emptyState.hidden = visible !== 0;
+    clearAll.hidden = !filtering;
+
+    // chip 高亮
+    document.querySelectorAll('[data-filter-tag]').forEach(function (el) {
+      el.classList.toggle('is-active', el.dataset.filterTag === state.tag);
+    });
+    document.querySelectorAll('[data-filter-year]').forEach(function (el) {
+      el.classList.toggle('is-active', el.dataset.filterYear === state.year);
+    });
+
+    // 同步 URL（不产生历史记录堆积）
+    var p = new URLSearchParams();
+    if (state.tag) p.set('tag', state.tag);
+    if (state.year) p.set('year', state.year);
+    if (q) p.set('q', state.q);
+    var qs = p.toString();
+    history.replaceState(null, '', qs ? '?' + qs : location.pathname);
+  }
+
+  // 点击标签 chip
+  document.querySelectorAll('[data-filter-tag]').forEach(function (el) {
+    el.addEventListener('click', function () {
+      state.tag = el.dataset.filterTag;
+      apply();
+    });
+  });
+
+  // 点击年份 chip
+  document.querySelectorAll('[data-filter-year]').forEach(function (el) {
+    el.addEventListener('click', function () {
+      state.year = el.dataset.filterYear;
+      apply();
+    });
+  });
+
+  // 卡片上的标签：点击筛选而不是跳转
+  grid.querySelectorAll('button.tag').forEach(function (el) {
+    el.addEventListener('click', function (ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      state.tag = el.dataset.tag;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      apply();
+    });
+  });
+
+  // 搜索（防抖）
+  var timer;
+  searchInput.addEventListener('input', function () {
+    clearTimeout(timer);
+    timer = setTimeout(function () {
+      state.q = searchInput.value;
+      apply();
+    }, 180);
+  });
+
+  function reset() {
+    state = { tag: '', year: '', q: '' };
+    searchInput.value = '';
+    apply();
+  }
+  clearAll.addEventListener('click', reset);
+  clearEmpty.addEventListener('click', reset);
+
+  // 初始化：回填 URL 中的搜索词
+  if (state.q) searchInput.value = state.q;
+  apply();
+})();
+</script>
+
+</body>
+</html>
