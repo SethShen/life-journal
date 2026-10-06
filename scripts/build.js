@@ -455,9 +455,6 @@ function main() {
     )
     .join('');
 
-  // 时间轴分组的年份（供 JS 生成分节）
-  const timelineYears = Object.keys(yearCount).sort((a, b) => b.localeCompare(a));
-
   // ---- 成长足迹：月度相册卡片墙 ----
   // 每月一版，杂志竖版结构（页眉大号月份 → 封面 → 编号站点 → 页脚小结）
   const growthHtml = growthRecords
@@ -495,7 +492,6 @@ function main() {
     count: trips.length,
     tag_filters: tagFilters,
     year_filters: yearFilters,
-    timeline_years: JSON.stringify(timelineYears),
     growth_albums: growthHtml,
     growth_count_text: escapeHtml(growthCountText),
     site_title: '生活记录',

@@ -4,7 +4,7 @@
  *
  * 用法：
  *   npm run new -- --slug sanya --title "三亚三日" --date 2026-01-01 --location "海南·三亚"
- *   npm run new -- --growth --slug first-steps --title "第一次独立走路" --date 2026-01-18 --birthdate 2024-05-20
+ *   npm run new -- --growth --slug first-steps --title "第一次独立走路" --date 2026-01-18 --birthdate 2023-03-16
  *
  * 会创建：
  *   游记：   content/<date>-<slug>.md  +  photos/<slug>/
@@ -50,7 +50,7 @@ const title = args.title || (isGrowth ? `小雨的${monthCn}` : slug);
 if (!slug) {
   console.error('✗ 缺少 --slug 参数。示例：');
   console.error('  游记：npm run new -- --slug sanya --title "三亚三日" --date 2026-01-01 --location "海南·三亚"');
-  console.error('  成长：npm run new -- --growth --date 2026-03-31 --birthdate 2024-05-20');
+  console.error('  成长：npm run new -- --growth --date 2026-03-31 --birthdate 2023-03-16');
   process.exit(1);
 }
 
