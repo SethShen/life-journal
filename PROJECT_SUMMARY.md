@@ -446,7 +446,33 @@ article.album-page
 
 > ⚠️ **历史说明**：2026-10-06 之前本文档曾错误地记为「Gitee 私有仓库」。实际从未使用 Gitee，代码始终托管在 GitHub。该错误已于 2026-10-06 修正。
 
-### 方案 A：Cloudflare Pages（推荐，唯一在用）
+### 7.1 线上地址（实测）
+
+| 项 | 值 |
+|---|---|
+| **实际部署** | **Cloudflare Workers**（非 Pages） |
+| **线上地址** | `https://life-journal.1019122863.workers.dev/` |
+| Workers 账户号 | `1019122863` |
+
+> ⚠️ **重要**：域名是 `workers.dev` 而非 `pages.dev`，说明用的是 **Workers** 部署方式。
+> Workers **不会**因push 自动构建——它需要一个 Worker 脚本 + `wrangler deploy` 或 CI 触发。
+> 这就是「推送后线上内容不更新」的根本原因（详见第 8 节）。
+
+> ⚠️ **另注**：`life-journal.pages.dev` 这个域名返回 200，但内容是**完全无关的英文站**
+> （标题 `My Life Journal`，内容为埃及胡尔格达潜水游记，HTML 类名为 `entry-title` 那套）。
+> **那不是本项目**，不要被200 的响应码误导。
+
+### 7.2 让线上更新最新提交
+
+因为是 Workers 而非 Pages，`git push` 不会自动部署。三个选项：
+
+| 方案 | 做法 | 适用 |
+|---|---|---|
+| **A. 改用 Pages**（推荐） | Cloudflare 后台新建 Pages 项目，连 GitHub，push 即自动构建 | 想全自动 |
+| **B. Workers + CI** | 加 GitHub Actions，push 时跑 `wrangler deploy` | 保留 Workers |
+| **C. 手动上传** | 本地 `npm run build` 后 `wrangler pages deploy public` | 偶尔更新 |
+
+
 
 连GitHub 仓库，push 后自动构建，无需手动操作。
 
@@ -494,6 +520,9 @@ wrangler pages deploy public --project-name=life-journal
 |---|---|---|
 | 仓库体积 | git 历史永久保留大文件 | 提交前压缩照片；不要反复删传 |
 | 单文件上限 | GitHub 单文件 100MB | 压缩后远低于此 |
+| **push 不自动部署** | **线上是 Workers 不是 Pages，`git push` 不会触发构建** | 见第 7.2 节，或改用 Pages |
+| **pages.dev 同名占用** | `life-journal.pages.dev` 已被别的站占用（返回 200 但内容无关） | 创建项目时换名，勿被 200误导 |
+| **birthdate 必须准确** | 成长记录年龄全靠 `birthdate` + `date` 自动计算 | 填错会导致全部年龄偏小/偏大 |
 | Pages 公开性 | 生成的网址知道链接即可访问 | 敏感照片不要上传，或加访问控制 |
 | `.gitignore` | `public/` 和 `node_modules/` 必须忽略 | 已配置 |
 | 国内访问 | `pages.dev` 偶尔波动 | 可绑定自有域名 |
@@ -536,7 +565,8 @@ npm run dev               # 构建 + 本地预览 (http://localhost:8080)
 
 | 日期 | 类型 | 说明 |
 |---|---|---|
-| 2026-10-06 | feat | **接入九月版成长相册**（`content/growth/2025-09.md`）：把 growth-album 技能的**定稿文案**转为站点内容——序 + 01 江南天池（浙江安吉，海拔约 900 米）+ 02 良渚遗址公园（浙江杭州，五千年前的水稻田）+ 附 鹿苑 + 九月小结，共 10 处图片引用（11 张照片、1 段视频，视频暂未接入站点）。**新增 `::: stats` 数据卡语法**（三栏客观数字，如「900 m 山顶海拔」），`renderMarkdown()` 改为逐行扫描解析；**修复 `formatAge()` 从未被调用的 bug**（成长记录年龄一直为空，现按 `birthdate` + `date` 自动计算，九月版得「1 岁 4 个月 10 天」）；`readRecords()` 补充返回 `birthdate` 字段。第 3/4/5 节已同步 |
+| 2026-10-06 | fix | **修正小雨出生日期**：此前误填 `2024-05-20`，改为 `2023-03-15`，年龄自动重算为九月版 2 岁 6 个月 / 一月 2 岁 10 个月 / 二月 2 岁 11 个月；同时删除两篇示例里手写的 `age` 字段，改为完全依赖 `birthdate` 计算。**并记录部署方式变更**：确认线上是 **Cloudflare Workers**（`life-journal.1019122863.workers.dev`）而非 Pages，故 `git push` 不会自动构建；第 7 节新增「线上地址（实测）」与「让线上更新最新提交」三方案，第 8 节新增三条坑（push 不自动部署 / pages.dev 同名被占用 / birthdate 必须准确）。同时澄清 `life-journal.pages.dev` 返回 200 但内容为无关英文站，**不是本项目** |
+| 2026-10-06 | feat | **接入九月版成长相册**（`content/growth/2025-09.md`）：把 growth-album 技能的**定稿文案**转为站点内容——序 + 01 江南天池（浙江安吉，海拔约 900 米）+ 02 良渚遗址公园（浙江杭州，五千年前的水稻田）+ 附 鹿苑 + 九月小结，共 10 处图片引用（11 张照片、1 段视频，视频暂未接入站点）。**新增 `::: stats` 数据卡语法**（三栏客观数字，如「900 m 山顶海拔」），`renderMarkdown()` 改为逐行扫描解析；**修复 `formatAge()` 从未被调用的 bug**（成长记录年龄一直为空，现按 `birthdate` + `date` 自动计算）；`readRecords()` 补充返回 `birthdate` 字段。第 3/4/5 节已同步 |
 | 2026-10-06 | feat | **集成 growth-album 技能，成长足迹改为月度相册结构**：首页成长视图从「时间轴列表」改为**月度相册卡片墙**（每张卡片含GROWING FOOTPRINTS kicker + 标题 + 年龄胶囊 + 大号年月 + 封面 + 摘要）；详情页改**杂志竖版**（页眉大号年月 → 正文「序/01/02 站点/本月小结」→ 页脚「X月结束」）；配色改用技能绿系（`--al-green #3a6a4a`），**仅作用于成长区**，深色模式已适配；内容改为**每月一版**（文件名 = 月份，slug = 月份），删除原两篇事件式记录并按**文案铁律**重写为月度版；**新增第 4.4 节「文案铁律」**（八条禁令 + 允许写法 + 字数目标 400–550 字）；修复 `renderMarkdown()` 引用块——连续 `> ` 行现在合并为单个 `<blockquote>`（原实现每行各自成块，导致「序」散架）；`new-trip.js` 的 `--growth` 模式 slug/标题可省略（自动取月份与「小雨的X月」）；PROJECT_SUMMARY 第 3/4/5/9 节已同步 |
 | 2026-10-06 | feat | **新增「成长足迹」页签（初版，时间轴结构）**：首页加「旅程 / 成长足迹」双页签（纯前端切换，`?view=growth` 可分享、支持前进后退）；新增 `content/growth/` 内容通道与 `growth/<slug>.html` 详情页（复用灯箱）；旅行与成长共用 `readRecords()` 统一读取，`content/growth/` 缺失时自动降级；`build.js` 新增 `formatAge()` 自动算年龄（3 岁内到天、更大到月）；`new-trip.js` 新增 `--growth` 参数；`style.css` 新增页签与时间轴样式。**（同日被上一条重构为月度相册结构）** |
 | 2026-10-06 | chore | GitHub 仓库改名：`SethShen/life-journa` → **`SethShen/life-journal`**（修正手误，末尾补l）；本地 remote 已同步更新，fetch/push 验证通过。文档内的仓库名引用在上一条修订时已全部写成正确名，无需改动 |
