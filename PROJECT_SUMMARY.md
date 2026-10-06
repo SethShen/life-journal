@@ -108,12 +108,14 @@ life-journal/
 ├── package.json            ← 脚本入口（build / dev / new / compress）
 ├── content/                ← 【旅行游记区】
 │   ├── _template.md        ← 新游记模板
+│   ├── 2025-07-19-wenling-2025.md      ← 台州温岭海边一日，9 张照片 + 视频 1 段（route 行程页）
 │   └── 2026-06-08-qinggan-2026.md      ← 78 张照片 + route 行程数据（8 天）
 ├── content/growth/         ← 【成长足迹区】每月一版，女儿小雨的成长相册
 │   ├── 2026-09.md          ← 九月版（江南天池 + 良渚，含数据卡与视频）← 定稿内容
 │   └── _template.md        ← 成长记录模板（序 / 01 / 02 / 小结）
 ├── photos/                 ← 【资源区】按 slug 分目录
 │   ├── qinggan-2026/       ← 78 张
+│   ├── wenling-2025/       ← 9 张 + 视频 1 段 + 视频封面
 │   └── 2026-09/            ← 九月版照片 10 张 + 视频 1 段 + 视频封面
 ├── templates/              ← 【模板区】HTML 骨架
 │   ├── index.html          ← 首页（页签切换 + 旅程筛选 + 成长时间轴）
@@ -700,6 +702,7 @@ npm run dev               # 构建 + 本地预览 (http://localhost:8080)
 
 | 日期 | 类型 | 说明 |
 |---|---|---|
+| 2026-10-06 | content | **集成台州温岭海边一日**（`2025-07-19-wenling-2025.md`）：9 张照片 + 视频 1 段（854 长边 / CRF 30，1.6MB）+ 封面，单篇合计约 4.3MB（预算 6MB 内）。源目录 19 张静片，**剔除 10 张含人物的照片**（特写自拍 5 张 + 中景人物 5 张）——站点公开可访问，正脸照片是否可上传待用户拍板（`.nightrun/待确认.md` O-3），用户确认后可再补入。`map: true` 行程页：Day 坐标取自照片 EXIF GPS（28.282, 121.622，WGS-84）；景点/餐饮用「画面可见」的描述性名称（海景观景步道 / 渔村与海湾 / 海鲜晚餐），**未编造正式地名与店名**；晚餐店名/菜名在正文标注「待补」。第 3 节目录树已同步 |
 | 2026-10-06 | fix | **按独立审核收口：名称兜底收窄、卡片换行、文档口径**。① `mergeNarrative()` 的**名称/酒店兜底从「包含判定」收窄为「全等 + 唯一性判定」** —— 新增 `itemNameCount`/`hotelNameCount` 统计 route 侧归一化同名数，同名不唯一时只认全等，避免「三家汉庭酒店互相张冠李戴」的静默错配（审核用 4 组单元用例实测通过；真实内容 30 个条目 100% 命中、`extra` 仍仅 T3 一条）。② `route-page.js` 新增 `escBr()`（先转义再 `\n`→`<br>`），卡片 desc 与 day summary 的换行不再被折叠成一段（「莫高窟」的 ①②③ 恢复分行）。③ 删除死选择器 `.rt-panel-fallback`。④ 行程页 `content` 改为 if/else 单次计算（原先 `map:true` 时 `renderGallery` 会被调用两次，第一次用的是未合并的 route）。⑤ 文档口径：`AGENTS.md` 部署行、第 5 节数据流、第 10 节交接语、`templates/index.html` 页脚「Powered by Cloudflare Pages」均改为 **Cloudflare Workers**；第 3 节目录树审核清单编号 `G-1~G-10` → `G-1~G-17`。**未采纳的一条**：审核建议「route 已有 desc 时不覆盖」，未按此改 —— route 的 desc 是压缩过的二手版本，正文才是原始记录，保留「正文更长才覆盖」可复原用户原话 |
 | 2026-10-06 | fix | **修好行程页地图，并消除正文与 Day 面板的重复内容**。① **地图不显示的真因是 CSS 回归**：上一轮把「死选择器」`.rt-map .leaflet-container` 改成 `.rt-map.leaflet-container{width:100%;height:100%}` 后反而生效了 —— Leaflet 把 `leaflet-container` 类加在同一个 div 上，而父级 `.trip-content` 高度是 `auto`，`height:100%` 退化成 `auto`，容器塌成 0 高、地图完全不可见。已删除该规则（高度只由 `.rt-map` 的 `420px` 决定）。② Leaflet 的 CSS/JS 从 body 中部移到 `<head>`（新增 `{{route_head}}` 插槽，`route-page.js` 导出 `routeHead()`）。③ **消除重复**：`map: true` 时 `stripDaySections()` 把正文的 `## Day …` 小节整段摘掉（与 Day 面板同源），`extractNarrative()` 抽出 `### 小节` 的原始文字与图片，`mergeNarrative()` 按**照片编号优先、名称兜底**合并回对应 Day 卡片 —— 正文是原始记录、route 的 `desc` 是压缩版，故**只在正文更长时才覆盖**；酒店小节按名称整体替换进 `hotel` 字段（避免「— A — B」叠加）；未匹配的挂到最近匹配到的当天作 `extra` 卡片并输出 `⚠️` 警告。④ `renderGallery()` 把 `route` 引用的照片也算「已使用」，否则 78 张会全掉进「其余照片」相册。⑤ 页面顺序调整为导语 → 地图 → Day 面板 → 结尾引用块（花费小结）。**实测**：用无头 Edge 截图确认高德瓦片/路线折线/标记/缩放控件均正常渲染；正文 36 个 `###` 小节去标点逐一比对产物，**零丢失**；产物只剩 Day 1 面板可见（其余 7 天 `display:none`）。第 4.3.1 节已重写，审核清单新增 G-15~G-17 |
 | 2026-10-06 | fix | **删除旅行区 5 篇示例 + 修复行程页地图 + 去掉多余总览**。① 删除 `2024-07-15-qinghai` / `2024-10-02-beijing` / `2025-03-20-hangzhou` / `2025-08-08-xiamen` / `2026-04-12-chengdu` 五篇**种子示例**（正文均为「这里写下当天的经历」占位文案）及对应照片目录，旅行区现仅剩青甘 1 篇（+`_template`）。② **修复地图不显示** —— 两个 bug 叠加：**漏加载 `leaflet.css`**（只引了 js，瓦片错位成空白）+ **瓦片源不可达**（CARTO/OSM 实测 HTTP 000 被墙）。已把 Leaflet **本地化**到 `src/vendor/leaflet/`（js/css/images 178KB，`build.js` 复制到 `public/vendor/`）并改用**高德瓦片**（实测 200、中文标注）。③ 删除青甘正文开头的**「行程总览」6 行表格**（Day 面板已展示每天的路线与住宿，重复），保留引言与「花费小结」。第 0/3/4/5 节、`AGENTS.md`、`.codebuddy-memory.md` 均已同步计数 |
