@@ -108,6 +108,40 @@ function renderMarkdown(md, slug, base = '') {
     }
   );
 
+  // 3.5) 数据卡（::: stats  数值 | 标签）
+  // 逐行扫描，遇到 ::: stats 后收集所有含| 的行为卡片，直到空行或非数据行
+  html = html
+    .split('\n')
+    .reduce((acc, line) => {
+      if (/^:::\s*stats\s*$/.test(line.trim())) {
+        acc.push({ stats: true, rows: [] });
+        return acc;
+      }
+      const cur = acc[acc.length - 1];
+      if (cur && cur.stats) {
+        if (line.trim() && line.includes('|')) {
+          cur.rows.push(line.trim());
+          return acc;
+        }
+        // 结束数据卡
+        const cards = cur.rows
+          .map((r) => {
+            const [num, ...rest] = r.split('|');
+            const label = rest.join('|').trim();
+            return `<div class="stat"><div class="stat-num">${num.trim()}</div><div class="stat-lab">${label}</div></div>`;
+          })
+          .join('');
+        acc.push(`<div class="stats">${cards}</div>`);
+        acc.push({ stats: false, rows: [] });
+        return acc;
+      }
+      acc.push(line);
+      return acc;
+    }, [])
+    .map((x) => (typeof x === 'string' ? x : ''))
+    .filter((x, i, arr) => !(x === '' && arr[i - 1] === ''))
+    .join('\n');
+
   // 4) 标题
   html = html.replace(/^###\s+(.*)$/gm, '<h3>$1</h3>');
   html = html.replace(/^##\s+(.*)$/gm, '<h2>$1</h2>');
@@ -253,6 +287,7 @@ function readRecords(dir, base = '..') {
       age: meta.age || '',
       month: meta.month || String(meta.date || nameBase).slice(0, 7),
       monthCn: monthCn(meta.month || meta.date || nameBase),
+      birthdate: meta.birthdate || '',
       html: renderMarkdown(body, slug, base),
       bodyRaw: body,
     };
@@ -301,11 +336,12 @@ function main() {
   const trips = readRecords(CONTENT_DIR);
   const growth = readRecords(GROWTH_DIR);
 
-  // 成长记录：算年龄 + 按日期倒序（缺失 birthdate 时 age 取 front-matter 的值）
+  // 成长记录：算年龄 + 按日期倒序
+  // age 字段优先；未填时用 birthdate + date 自动算
   const growthRecords = growth
     .map((t) => ({
       ...t,
-      ageText: t.age || '',
+      ageText: t.age || formatAge(t.birthdate, t.date),
     }))
     .sort((a, b) => String(b.date).localeCompare(String(a.date)));
 
