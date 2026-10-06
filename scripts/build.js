@@ -11,6 +11,7 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
 const CONTENT_DIR = path.join(ROOT, 'content');
+const GROWTH_DIR = path.join(CONTENT_DIR, 'growth');
 const PHOTOS_DIR = path.join(ROOT, 'photos');
 const TEMPLATES_DIR = path.join(ROOT, 'templates');
 const SRC_DIR = path.join(ROOT, 'src');
@@ -157,32 +158,59 @@ function slugify(s) {
     .replace(/^-|-$/g, '');
 }
 
-// ---------- 主流程 ----------
+/**
+ * 计算「X岁Y个月Z天」格式的年龄描述。
+ * 用于成长足迹时间轴 —— 比日期更能体现成长的刻度。
+ */
+function formatAge(birthDate, atDate) {
+  if (!birthDate) return '';
+  const b = new Date(birthDate);
+  const a = atDate ? new Date(atDate) : new Date();
+  if (isNaN(b.getTime()) || isNaN(a.getTime())) return '';
 
-function main() {
-  console.log('🏗  Building life-journal ...');
+  let years = a.getFullYear() - b.getFullYear();
+  let months = a.getMonth() - b.getMonth();
+  let days = a.getDate() - b.getDate();
 
-  // 清理旧产物
-  if (fs.existsSync(OUT_DIR)) fs.rmSync(OUT_DIR, { recursive: true, force: true });
-  ensureDir(OUT_DIR);
-  ensureDir(path.join(OUT_DIR, 'trip'));
-
-  // 读取所有 md
-  if (!fs.existsSync(CONTENT_DIR)) {
-    console.error('✗ content/ 目录不存在');
-    process.exit(1);
+  if (days < 0) {
+    months -= 1;
+    // 借上个月天数
+    const prev = new Date(a.getFullYear(), a.getMonth(), 0).getDate();
+    days += prev;
+  }
+  if (months < 0) {
+    years -= 1;
+    months += 12;
   }
 
+  const parts = [];
+  if (years > 0) parts.push(`${years} 岁`);
+  if (months > 0) parts.push(`${months} 个月`);
+  if (years === 0 && months === 0) parts.push(`${days} 天`);
+  else if (days > 0 && years < 3) parts.push(`${days} 天`);
+
+  return parts.join(' ');
+}
+
+/**
+ * 读取一个内容目录，返回记录数组。
+ * @param {string} dir内容目录
+ * @param {string} base 资源路径前缀（'' = 首页同级；'..' = 子目录）
+ */
+function readRecords(dir, base = '..') {
+  if (!fs.existsSync(dir)) return [];
+
   const files = fs
-    .readdirSync(CONTENT_DIR)
+    .readdirSync(dir)
     .filter((f) => f.endsWith('.md') && !f.startsWith('_'));
 
-  const trips = files.map((file) => {
-    const raw = fs.readFileSync(path.join(CONTENT_DIR, file), 'utf8');
+  return files.map((file) => {
+    const raw = fs.readFileSync(path.join(dir, file), 'utf8');
     const { meta, body } = parseFrontMatter(raw);
 
-    const base = file.replace(/\.md$/, '');
-    const slug = meta.slug || base.replace(/^\d{4}-\d{2}-\d{2}-/, '') || slugify(meta.title || base);
+    const nameBase = file.replace(/\.md$/, '');
+    const slug =
+      meta.slug || nameBase.replace(/^\d{4}-\d{2}-\d{2}-/, '') || slugify(meta.title || nameBase);
 
     // 收集该 slug 下的照片
     const photoDir = path.join(PHOTOS_DIR, slug);
@@ -199,17 +227,71 @@ function main() {
     return {
       file,
       slug,
-      title: meta.title || base,
-      date: meta.date || base.slice(0, 10),
+      title: meta.title || nameBase,
+      date: meta.date || nameBase.slice(0, 10),
       location: meta.location || '',
       summary: meta.summary || '',
       tags: Array.isArray(meta.tags) ? meta.tags : [],
       cover,
       photos,
-      html: renderMarkdown(body, slug, '..'),
+      // 成长足迹专属字段
+      age: meta.age || '',
+      milestone: meta.milestone || '',
+      html: renderMarkdown(body, slug, base),
       bodyRaw: body,
     };
   });
+}
+
+/** 未被正文引用的照片 → 底部相册 */
+function renderGallery(rec) {
+  const usedInBody = new Set();
+  const re = /photos:([A-Za-z0-9._-]+)/g;
+  let mm;
+  while ((mm = re.exec(rec.bodyRaw)) !== null) usedInBody.add(mm[1]);
+
+  const restPhotos = rec.photos.filter((p) => !usedInBody.has(p));
+  if (!restPhotos.length) return '';
+
+  return (
+    `<h2 class="gallery-title">其余照片</h2><div class="gallery">` +
+    restPhotos
+      .map(
+        (p) =>
+          `<a class="gallery-item" href="../photos/${rec.slug}/${p}" target="_blank" rel="noopener">` +
+          `<img src="../photos/${rec.slug}/${p}" alt="" loading="lazy"></a>`
+      )
+      .join('') +
+    `</div>`
+  );
+}
+
+// ---------- 主流程 ----------
+
+function main() {
+  console.log('🏗  Building life-journal ...');
+
+  // 清理旧产物
+  if (fs.existsSync(OUT_DIR)) fs.rmSync(OUT_DIR, { recursive: true, force: true });
+  ensureDir(OUT_DIR);
+  ensureDir(path.join(OUT_DIR, 'trip'));
+
+  // 读取所有 md —— content/ 为旅行，content/growth/ 为成长足迹
+  if (!fs.existsSync(CONTENT_DIR)) {
+    console.error('✗ content/ 目录不存在');
+    process.exit(1);
+  }
+
+  const trips = readRecords(CONTENT_DIR);
+  const growth = readRecords(GROWTH_DIR);
+
+  // 成长记录：算年龄 + 按日期倒序（缺失 birthdate 时 age 取 front-matter 的值）
+  const growthRecords = growth
+    .map((t) => ({
+      ...t,
+      ageText: t.age || '',
+    }))
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)));
 
   // 按日期倒序
   trips.sort((a, b) => String(b.date).localeCompare(String(a.date)));
@@ -284,43 +366,77 @@ function main() {
   // 时间轴分组的年份（供 JS 生成分节）
   const timelineYears = Object.keys(yearCount).sort((a, b) => b.localeCompare(a));
 
+  // ---- 成长足迹：按月分组的时间轴 ----
+  const growthByMonth = {};
+  for (const g of growthRecords) {
+    const ym = String(g.date).slice(0, 7);
+    (growthByMonth[ym] = growthByMonth[ym] || []).push(g);
+  }
+
+  const timeline =
+    Object.keys(growthByMonth)
+      .sort((a, b) => b.localeCompare(a))
+      .map((ym) => {
+        const [yy, mm] = ym.split('-');
+        const items = growthByMonth[ym]
+          .map((g) => {
+            const cover = g.cover
+              ? `<img class="tl-cover" src="photos/${g.slug}/${g.cover}" alt="" loading="lazy">`
+              : '';
+            const age = g.ageText
+              ? `<span class="tl-age">${escapeHtml(g.ageText)}</span>`
+              : '';
+            const milestone = g.milestone
+              ? `<span class="tl-milestone">${escapeHtml(g.milestone)}</span>`
+              : '';
+            const day = String(g.date).slice(8, 10);
+            return `
+          <li class="tl-item">
+            <div class="tl-marker" aria-hidden="true"></div>
+            <div class="tl-body">
+              <div class="tl-date"><span class="tl-day">${escapeHtml(day)}</span>${age}${milestone}</div>
+              <a class="tl-card" href="growth/${g.slug}.html">
+                ${cover}
+                <div class="tl-text">
+                  <h3 class="tl-title">${escapeHtml(g.title)}</h3>
+                  ${g.summary ? `<p class="tl-summary">${escapeHtml(g.summary)}</p>` : ''}
+                </div>
+              </a>
+            </div>
+          </li>`;
+          })
+          .join('');
+
+        return `
+      <section class="tl-month">
+        <h3 class="tl-month-label"><span class="tl-year">${escapeHtml(yy)}</span><span class="tl-mon">${escapeHtml(mm)} 月</span></h3>
+        <ul class="tl-list">${items}
+        </ul>
+      </section>`;
+      })
+      .join('\n');
+
+  const growthCountText = growthRecords.length
+    ? `${growthRecords.length} 条记录`
+    : '';
+
   const indexHtml = applyTemplate(indexTpl, {
     cards,
     count: trips.length,
     tag_filters: tagFilters,
     year_filters: yearFilters,
     timeline_years: JSON.stringify(timelineYears),
+    timeline,
+    growth_count_text: escapeHtml(growthCountText),
+    has_growth: growthRecords.length ? 'true' : '',
     site_title: '生活记录',
     updated: new Date().toISOString().slice(0, 10),
   });
   fs.writeFileSync(path.join(OUT_DIR, 'index.html'), indexHtml);
 
-  // ---- 生成详情页 ----
+  // ---- 生成旅行详情页 ----
   const tripTpl = readTemplate('trip.html');
   for (const t of trips) {
-    // 找出正文中被引用的图片
-    const usedInBody = new Set();
-    const re = /photos:([A-Za-z0-9._-]+)/g;
-    let mm;
-    while ((mm = re.exec(t.bodyRaw)) !== null) usedInBody.add(mm[1]);
-
-    // 未被正文引用的照片 → 底部相册
-    const restPhotos = t.photos.filter((p) => !usedInBody.has(p));
-
-    let gallery = '';
-    if (restPhotos.length) {
-      gallery =
-        `<h2 class="gallery-title">其余照片</h2><div class="gallery">` +
-        restPhotos
-          .map(
-            (p) =>
-              `<a class="gallery-item" href="../photos/${t.slug}/${p}" target="_blank" rel="noopener">` +
-              `<img src="../photos/${t.slug}/${p}" alt="" loading="lazy"></a>`
-          )
-          .join('') +
-        `</div>`;
-    }
-
     const tags = t.tags
       .map(
         (tag) =>
@@ -333,11 +449,35 @@ function main() {
       date: escapeHtml(t.date),
       location: escapeHtml(t.location),
       tags,
-      content: t.html + gallery,
+      content: t.html + renderGallery(t),
       photo_count: t.photos.length,
       site_title: '生活记录',
     });
     fs.writeFileSync(path.join(OUT_DIR, 'trip', `${t.slug}.html`), html);
+  }
+
+  // ---- 生成成长足迹详情页 ----
+  const growthTpl = readTemplate('growth.html');
+  ensureDir(path.join(OUT_DIR, 'growth'));
+  for (const g of growthRecords) {
+    const tags = (g.tags || [])
+      .map(
+        (tag) =>
+          `<a class="tag" href="../index.html?view=growth&tag=${encodeURIComponent(tag)}">${escapeHtml(tag)}</a>`
+      )
+      .join('');
+
+    const html = applyTemplate(growthTpl, {
+      title: escapeHtml(g.title),
+      date: escapeHtml(g.date),
+      age: escapeHtml(g.ageText),
+      milestone: g.milestone ? escapeHtml(g.milestone) : '',
+      tags,
+      content: g.html + renderGallery(g),
+      photo_count: g.photos.length,
+      site_title: '生活记录',
+    });
+    fs.writeFileSync(path.join(OUT_DIR, 'growth', `${g.slug}.html`), html);
   }
 
   // ---- 复制资源 ----
@@ -346,8 +486,11 @@ function main() {
     fs.copyFileSync(path.join(SRC_DIR, 'style.css'), path.join(OUT_DIR, 'style.css'));
   }
 
-  console.log(`✓ Built ${trips.length} trip(s) → public/`);
+  console.log(`✓ Built ${trips.length} trip(s) + ${growthRecords.length} growth record(s) → public/`);
   trips.forEach((t) => console.log(`   · ${t.date}  ${t.title}  (${t.photos.length} photos)`));
+  growthRecords.forEach((g) =>
+    console.log(`   · ${g.date}  [成长] ${g.title}${g.ageText ? '  ' + g.ageText : ''}`)
+  );
 }
 
 main();

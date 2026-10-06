@@ -12,11 +12,20 @@
 <header class="site-header">
   <div class="wrap">
     <h1 class="site-title">{{site_title}}</h1>
-    <p class="site-sub">共 <span id="total-count">{{count}}</span> 段旅程 · 更新于 {{updated}}</p>
+    <p class="site-sub">共 <span id="total-count">{{count}}</span> 段旅程<span id="growth-summary">{{growth_count_text}}</span> · 更新于 {{updated}}</p>
   </div>
 </header>
 
 <main class="wrap">
+
+  <!-- 页签 -->
+  <nav class="tabs" id="tabs" role="tablist">
+    <a class="tab is-active" href="?view=trips" data-view="trips" role="tab">旅程</a>
+    <a class="tab" href="?view=growth" data-view="growth" role="tab">成长足迹</a>
+  </nav>
+
+  <!-- ========== 旅程 ========== -->
+  <div class="view" id="view-trips">
 
   <!-- 筛选栏 -->
   <section class="filters" id="filters">
@@ -57,6 +66,26 @@
     <button class="clear-btn" type="button" id="clear-empty">清除筛选</button>
   </div>
 
+  </div><!-- /view-trips -->
+
+  <!-- ========== 成长足迹 ========== -->
+  <div class="view" id="view-growth" hidden>
+
+    <section class="growth-intro">
+      <p>按时间顺序，记录她长大的每一个刻度。</p>
+    </section>
+
+    <div class="timeline" id="timeline">
+      {{timeline}}
+    </div>
+
+    <div class="empty-state" id="growth-empty" hidden>
+      <div class="empty-icon">✦</div>
+      <p>还没有成长记录</p>
+    </div>
+
+  </div><!-- /view-growth -->
+
 </main>
 
 <footer class="site-footer">
@@ -67,6 +96,75 @@
 
 <script>
 (function () {
+  // ---- 页签切换：旅程 / 成长足迹 ----
+  var TABS = {
+    trips: {
+      tab: document.querySelector('[data-view="trips"]'),
+      view: document.getElementById('view-trips'),
+      summary: null
+    },
+    growth: {
+      tab: document.querySelector('[data-view="growth"]'),
+      view: document.getElementById('view-growth')
+    }
+  };
+  var growthSummary = document.getElementById('growth-summary');
+  var growthEmpty = document.getElementById('growth-empty');
+  var timeline = document.getElementById('timeline');
+  var current = 'trips';
+
+  function setView(name, pushUrl) {
+    if (!TABS[name]) name = 'trips';
+    current = name;
+
+    Object.keys(TABS).forEach(function (k) {
+      TABS[k].view.hidden = k !== name;
+      TABS[k].tab.classList.toggle('is-active', k === name);
+      TABS[k].tab.setAttribute('aria-selected', k === name ? 'true' : 'false');
+    });
+
+    // 副标题里的成长条数只在成长视图显示
+    if (growthSummary) growthSummary.hidden = name !== 'growth';
+
+    // 成长为空时提示
+    if (growthEmpty && timeline) {
+      growthEmpty.hidden = !!timeline.querySelector('.tl-item');
+    }
+
+    if (pushUrl) {
+      var p = new URLSearchParams(location.search);
+      if (name === 'growth') p.set('view', 'growth');
+      else p.delete('view');
+      // 切到成长视图时清掉旅行的筛选参数，反之亦然
+      p.delete('tag'); p.delete('year'); p.delete('q');
+      var qs = p.toString();
+      history.pushState(null, '', qs ? '?' + qs : location.pathname);
+    }
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  Object.keys(TABS).forEach(function (k) {
+    TABS[k].tab.addEventListener('click', function (ev) {
+      ev.preventDefault();
+      if (k === current) return;
+      setView(k, true);
+    });
+  });
+
+  // 从 URL 读取初始视图
+  if (new URLSearchParams(location.search).get('view') === 'growth') {
+    setView('growth', false);
+  } else {
+    setView('trips', false);
+  }
+
+  window.addEventListener('popstate', function () {
+    var v = new URLSearchParams(location.search).get('view');
+    setView(v === 'growth' ? 'growth' : 'trips', false);
+  });
+
+  // ---- 旅程筛选 ----
   var grid = document.getElementById('grid');
   var cards = Array.prototype.slice.call(grid.querySelectorAll('.card'));
   var searchInput = document.getElementById('search');
@@ -129,6 +227,7 @@
 
     // 同步 URL（不产生历史记录堆积）
     var p = new URLSearchParams();
+    if (current === 'growth') p.set('view', 'growth');
     if (state.tag) p.set('tag', state.tag);
     if (state.year) p.set('year', state.year);
     if (q) p.set('q', state.q);

@@ -35,6 +35,7 @@
 - **更新方式是提交代码**（Git 工作流），不是 CMS 后台
 - **由 AI 协助生成内容**：用户口述 + 丢照片，AI 生成游记 Markdown
 - **照片存放在代码仓库**里，随内容一起版本化
+- **双内容通道**：`content/` 存本人旅行游记，`content/growth/` 存女儿的成长记录，首页分页签展示
 
 一句话：**Git 就是数据库，Markdown 就是内容，push 就是发布。**
 
@@ -76,11 +77,11 @@ life-journal/
 ├── PROJECT_SUMMARY.md      ← 本文档（AI 入口，唯一权威）
 ├── AGENTS.md               ← AI 工作约定（强制同步本文档）
 ├── DEPLOY.md               ← 日常更新与推送流程
-├── DEPLOY_CLOUDFLARE.md    ← Cloudflare Pages 部署详解（含 wrangler 备选方案）
+├── DEPLOY_CLOUDFLARE.md    ← Cloudflare Pages 部署详解（含wrangler 备选方案）
 ├── .codebuddy-memory.md    ← 项目持久化记忆
 ├── README.md               ← 给人看的使用说明
 ├── package.json            ← 脚本入口（build / dev / new / compress）
-├── content/                ← 【内容区】每篇游记一个 md
+├── content/                ← 【旅行游记区】
 │   ├── _template.md        ← 新游记模板
 │   ├── 2024-07-15-qinghai.md
 │   ├── 2024-10-02-beijing.md
@@ -89,21 +90,30 @@ life-journal/
 │   ├── 2026-01-01-sample-trip.md
 │   ├── 2026-04-12-chengdu.md
 │   └── 2026-06-08-qinggan-2026.md      ← 78 张照片，最大的一篇
-├── photos/                 ← 【资源区】按 slug 分目录（7 个目录，共 91 张）
+│   └── growth/             ← 【成长足迹区】女儿成长记录
+│       ├── _template.md    ← 成长记录模板
+│       ├── 2026-01-18-first-steps.md
+│       └── 2026-02-09-first-word-mama.md
+├── photos/                 ← 【资源区】按 slug 分目录
 │   ├── beijing/  chengdu/  hangzhou/  qinghai/
 │   ├── qinggan-2026/       ← 78 张
 │   ├── sample-trip/  xiamen/
+│   └── first-steps/  first-word-mama/   ← 成长记录照片
 ├── templates/              ← 【模板区】HTML 骨架
-│   ├── index.html          ← 首页（含筛选栏与筛选脚本）
-│   └── trip.html           ← 详情页（含灯箱）
+│   ├── index.html          ← 首页（页签切换 + 旅程筛选 + 成长时间轴）
+│   ├── trip.html           ← 旅行详情页（含灯箱）
+│   └── growth.html         ← 成长记录详情页（含灯箱）
 ├── scripts/
-│   ├── build.js            ← 构建：md → html（含筛选数据注入）
+│   ├── build.js            ← 构建：md → html（旅行 + 成长双通道）
 │   ├── compress-images.js  ← 压缩照片（需 npm i -D sharp）
-│   ├── new-trip.js         ← 一键创建新游记骨架
+│   ├── new-trip.js         ← 一键创建新游记 / 成长记录骨架
 │   └── dev.js              ← 本地预览服务器（8080）
 ├── src/
 │   └── style.css           ← 全站样式（CSS 变量集中配色，含深色模式）
 ├── public/                 ← 构建产物（.gitignore 已忽略，不提交）
+│   ├── index.html
+│   ├── trip/<slug>.html    ← 旅行详情页
+│   └── growth/<slug>.html  ← 成长详情页
 └── .github/workflows/
     └── deploy.yml          ← GitHub Pages 部署（私有仓库下实际不可用，仅留档）
 ```
@@ -125,7 +135,7 @@ content/YYYY-MM-DD-slug.md
 
 ### 4.2 Front-matter（YAML 头）
 
-每篇 md **必须**以以下头部开始：
+每篇md **必须**以以下头部开始：
 
 ```yaml
 ---
@@ -149,6 +159,38 @@ tags: [旅行, 海边, 冬季]
 | `summary` | ⬜ | 一句话摘要，用于首页卡片 |
 | `tags` | ⬜ | 标签数组 |
 
+### 4.2.1 成长记录 Front-matter（成长足迹专用）
+
+成长记录放在 **`content/growth/`**，字段略有不同：
+
+```yaml
+---
+title: 第一次独立走路
+date: 2026-01-18
+slug: first-steps
+birthdate: 2024-05-20
+age: 1 岁 8 个月
+milestone: 第一次
+summary: 从沙发到餐桌，五步，摇摇晃晃。
+tags: [第一次, 大运动]
+---
+```
+
+| 字段 | 必填 | 说明 |
+|---|---|---|
+| `title` | ✅ | 标题 |
+| `date` | ✅ | 这一天发生的日期，ISO 格式（**决定时间轴排序**） |
+| `slug` | ✅ | 唯一标识，等于照片目录名 |
+| `birthdate` | ⬜ | 出生日期，用于自动算年龄 |
+| `age` | ⬜ | 手动指定的年龄文案，如 `1 岁 8 个月`。**优先于自动计算** |
+| `milestone` | ⬜ | 里程碑标记，如 `第一次`、`百日`、`周岁` |
+| `summary` | ⬜ | 一句话摘要，显示在时间轴卡片上 |
+| `tags` | ⬜ | 标签数组 |
+| `cover` | ⬜ | 封面图，缺省取第一张 |
+
+> **年龄显示规则**：`age` 字段优先；未填时由 `build.js` 的 `formatAge(birthdate, date)` 自动计算。
+> 3 岁以内会显示到「天」，更大只显示到「月」。
+
 ### 4.3 正文
 
 - 用标准 Markdown
@@ -170,12 +212,39 @@ tags: [旅行, 海边, 冬季]
 
 | 输出 | 来源 |
 |---|---|
-| `public/index.html` | 所有 md 按 date 倒序 → 卡片墙 + 筛选栏 |
-| `public/trip/<slug>.html` | 单篇 md → 详情页 |
+| `public/index.html` | 旅行 md 按 date 倒序 → 卡片墙 + 筛选栏 + 成长时间轴（双视图） |
+| `public/trip/<slug>.html` | 旅行 md → 详情页 |
+| `public/growth/<slug>.html` | 成长 md → 成长详情页 |
 | `public/photos/**` | 从 `photos/` 复制 |
 | `public/style.css` | 从 `src/style.css` 复制 |
 
 构建脚本特点：**零第三方依赖**，只用 Node 内置模块（`fs`/`path`）。这样在任何环境都能跑，不会因 npm 挂掉而失效。
+
+### 5.0 双内容通道
+
+项目有**两类内容**，由 `build.js` 的 `readRecords(dir, base)` 统一读取：
+
+| 通道 | 源目录 | 详情页路径 | 归属人 |
+|---|---|---|---|
+| 旅行 | `content/*.md` | `trip/<slug>.html` | 本人 |
+| 成长 | `content/growth/*.md` | `growth/<slug>.html` | 女儿 |
+
+`content/growth/` 不存在时会自动降级为空，**不影响旅行站的构建**。
+
+### 5.0.1 成长足迹页签
+
+首页顶部有「旅程 / 成长足迹」两个页签，纯前端切换，不重新请求页面。
+
+| 维度 | 实现 |
+|---|---|
+| 切换 | `templates/index.html` 内的 `setView(name, pushUrl)`，切换 `.view` 容器的 `hidden` |
+| URL | `?view=growth`（可分享、可收藏），用 `history.pushState` 写入，筛选参数用 `replaceState` |
+| 前进后退 | 监听 `popstate` 恢复对应视图 |
+| 成长视图展示 | 按**月份分节**的竖向时间轴（年份 + 月份标签），节点显示日、年龄、里程碑标签 |
+| 空状态 | 无成长记录时显示提示文案 |
+| 联动 | 副标题的成长条数仅在成长视图显示；切视图时清掉另一视图的筛选参数 |
+
+**时间轴的月份分节逻辑**：在 `build.js` 中按 `date.slice(0,7)` 聚合，月份**倒序**排列（最新在前），节内保持日期倒序。
 
 ### 5.1 筛选功能（前端实现，无需重新构建）
 
@@ -226,10 +295,14 @@ tags: [旅行, 海边, 冬季]
 
 | 页面 | 内联脚本功能 |
 |---|---|
-| `index.html` | 三向筛选（标签/年份/关键词）、URL 同步、空状态 |
+| `index.html` | 页签切换（旅程/成长）、三向筛选（标签/年份/关键词）、URL 同步、空状态 |
 | `trip.html` | 图片灯箱（放大、切换、键盘操作） |
+| `growth.html` | 图片灯箱（同上） |
 
 均**无外部 JS 依赖**，原生实现。
+
+> **模板变量注意**：`applyTemplate()` 只支持 `{{name}}` 简单替换，**不支持** `{{#condition}}` / `{{^}}` 这类 mustache 条件语法。
+> 需要条件渲染时，改用「始终输出 + JS 控制显隐」或「由 build.js 拼接好字符串再传入」。
 
 ---
 
@@ -337,7 +410,13 @@ wrangler pages deploy public --project-name=life-journal
 ## 9. 常用命令
 
 ```bash
+# 新增旅行游记
 npm run new -- --slug sanya --title "三亚三日" --date 2026-01-01 --location "海南·三亚"
+
+# 新增成长记录（--growth 会写入 content/growth/）
+npm run new -- --growth --slug first-steps --title "第一次独立走路" \
+  --date 2026-01-18 --birthdate 2024-05-20 --milestone 第一次
+
 npm run compress          # 压缩 photos/ 下所有图片
 npm run build             # 生成 public/
 npm run dev               # 构建 + 本地预览 (http://localhost:8080)
@@ -347,9 +426,11 @@ npm run dev               # 构建 + 本地预览 (http://localhost:8080)
 
 ## 10. 给 AI 的一句话交接
 
-> 这是「Git 即 CMS」的静态生活记录站。内容是 `content/*.md`，照片是 `photos/<slug>/`，
-> 构建是 `scripts/build.js`（零依赖），部署靠 Cloudflare Pages 自动。
-> **加一篇新游记 = 新增一个 md + 一个照片目录 + push**。改样式只动 `src/style.css` 和 `templates/`。
+> 这是「Git 即 CMS」的静态生活记录站。内容分两路：`content/*.md`（本人旅行），
+> `content/growth/*.md`（女儿成长记录），首页双页签切换，成长记录按月分节的时间轴展示。
+> 照片是 `photos/<slug>/`，构建是 `scripts/build.js`（零依赖），部署靠 Cloudflare Pages 自动。
+> **加一篇旅行 = 新增一个 md + 一个照片目录 + push**；**加一条成长记录 = 同上，但放`content/growth/`**。
+> 改样式只动 `src/style.css` 和 `templates/`。
 > **改完任何东西，记得回来更新本文档。**
 
 ---
@@ -361,6 +442,7 @@ npm run dev               # 构建 + 本地预览 (http://localhost:8080)
 
 | 日期 | 类型 | 说明 |
 |---|---|---|
+| 2026-10-06 | feat | **新增「成长足迹」功能**：首页加「旅程 / 成长足迹」双页签（纯前端切换，`?view=growth` 可分享、支持前进后退）；新增 `content/growth/` 内容通道与 `growth/<slug>.html` 详情页（复用灯箱）；旅行与成长共用 `readRecords()` 统一读取，`content/growth/` 缺失时自动降级；`build.js` 新增 `formatAge()` 自动算年龄（3 岁内到天、更大到月）、按月分组的时间轴生成（月份倒序）；`new-trip.js` 新增 `--growth` 参数；新增 `templates/growth.html`；`style.css` 新增页签与时间轴样式（含移动端适配）；示例内容 2 篇（第一次独立走路 / 会说「妈妈」了）。第 3、4、5、9 节已同步 |
 | 2026-10-06 | chore | GitHub 仓库改名：`SethShen/life-journa` → **`SethShen/life-journal`**（修正手误，末尾补l）；本地 remote 已同步更新，fetch/push 验证通过。文档内的仓库名引用在上一条修订时已全部写成正确名，无需改动 |
 | 2026-10-06 | docs | **修正部署信息错误**：第 7 节原写「Gitee 私有仓库 + Gitee Pages」为**事实错误**，实际代码始终托管在 GitHub（`git@github.com:SethShen/life-journal.git`，私有）。重写第 7 节为「Cloudflare Pages 连 GitHub（唯一在用）」+ wrangler 备选 + GitHub Pages 留档；第 3 节目录结构补`DEPLOY_CLOUDFLARE.md`、移除不存在的 `screenshots/`、补全 7 篇游记与 91 张照片的实际清单；README / DEPLOY.md / .codebuddy-memory.md 同步对齐 |
 | 2026-10-06 | chore | **仓库托管切换至 Gitee**（`gitee.com/seth_shen/life-journal`，私有），因开发环境无法访问 GitHub；新增 `DEPLOY.md` 部署指引；第 7 节重写（**已于同日撤销，实际未使用 Gitee，见上一条**） |
