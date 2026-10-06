@@ -34,6 +34,9 @@ description: life-journal 项目的强制审核清单（PROJECT_SUMMARY 第 0 �
 | G-12 | **一次性脚本已迁出** | 迁移类脚本移出仓库后，`PROJECT_SUMMARY.md` 不得再把它当现行工具描述 |
 | G-13 | **内嵌数据已转义** | 注入 `<script type="application/json">` 的数据必须转义 `<` `>` `&`（防 `</script>` breakout）；正文走 `renderMarkdown()` 的 `escapeHtml()`，同样防 breakout |
 | G-14 | **UI承诺的功能已接上** | 若 CSS给了 `cursor:zoom-in` 等交互暗示，对应的 JS 处理器必须真的绑上了 |
+| G-15 | **地图容器有确定高度** | `map: true` 的页面：`.rt-map` 必须靠自身 `height:420px` 撑开。⚠️ **绝不能给它加 `height:100%`** —— Leaflet 把 `leaflet-container` 加到同一个 div 上，父级高度是 auto → 百分比退化成 auto → 容器塌成 0 高、地图完全不可见。用无头浏览器截图确认瓦片/标记真的画出来了 |
+| G-16 | **正文与 Day 面板不重复** | `map: true` 时正文的 `## Day …` 小节必须被 `stripDaySections()` 摘掉；产物里不应再出现正文级的 Day 标题。同时 `mergeNarrative()` 合并后**正文文字零丢失**（去标点后逐条比对产物），无匹配的条目要出现在 `extra` 卡片或构建警告里 |
+| G-17 | **资源放对位置** | Leaflet 的 CSS/JS 必须走 `{{route_head}}` 进 `<head>`，不能混在 body 中部 |
 
 > **本机注意**：`build.js` 里的 `fs.rmSync(public, {recursive:true})` 会触发宿主 safe-delete 保护
 > （抛 `SAFE_DELETE_BULK_CONFIRM_REQUIRED`）。**该保护按整个 turn 内累计删除数计阈值，不是单次调用**，
@@ -47,7 +50,7 @@ description: life-journal 项目的强制审核清单（PROJECT_SUMMARY 第 0 �
 ## 成长区专项（改动涉及 content/growth/ 时跑）
 
 > 以下 P0-1~P0-5、P1-1~P1-8、P2 及文案八条禁令**均属成长区专项**；
-> 改动不涉及 `content/growth/` 时只需跑上面的 G-1~G-10。
+> 改动不涉及 `content/growth/` 时只需跑上面的 G-1~G-17。
 
 ## P0 = 阻塞，必须修
 

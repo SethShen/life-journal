@@ -1,5 +1,11 @@
 # Cloudflare Pages 部署指引
 
+> ⚠️ **现状提醒（2026-10-06 核实）**：线上实际跑的是 **Cloudflare Workers**
+> （`life-journal.1019122863.workers.dev`），**不是 Pages**，因此本文流程**目前没有生效** ——
+> Workers 是个跑代码的容器，不知道 GitHub 存在，`git push` **不会**自动部署。
+> 想改成「push 即上线」，按本文新建一个 Pages 项目即可（注意项目名 `life-journal` 已被占用，需换名）。
+> 三种方案的对比与取舍见 `PROJECT_SUMMARY.md` 第 7 节。
+
 > 照着这张清单走，10 分钟能上线。
 
 ---

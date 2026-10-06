@@ -98,7 +98,7 @@
 | 项目 | Life Journal（个人生活/旅行记录静态站） |
 | 核心模式 | Git 即 CMS：Markdown 是内容，push 是发布 |
 | 构建 | `npm run build` → `scripts/build.js`（零第三方依赖） |
-| 部署 | Cloudflare Pages（连 GitHub，push 自动构建） |
+| 部署 | **Cloudflare Workers**（非 Pages），`git push` **不会**自动部署，见 `PROJECT_SUMMARY.md` 第 7 节 |
 | 权威文档 | `PROJECT_SUMMARY.md` |
 
 详细说明一律以 `PROJECT_SUMMARY.md` 为准。

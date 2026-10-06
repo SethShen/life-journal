@@ -10,7 +10,10 @@
 /** 行程页所需的 CSS（注入到页面 <style> 里） */
 const ROUTE_CSS = `
 .rt-map{position:relative;height:420px;border-radius:14px;overflow:hidden;margin:28px 0 12px;background:var(--al-green-soft,#eaf0e7);border:1px solid var(--border,#ece7e0)}
-.rt-map.leaflet-container{width:100%;height:100%}
+/* 注意：不要再给地图容器加 height:100%。
+   Leaflet 会把 leaflet-container 类加到同一个 div 上，而父级高度是 auto，
+   百分比高度会退化成 auto → 容器塌成 0 高，地图整个不可见（踩过此坑）。
+   高度只由上面 .rt-map 的 420px 决定。 */
 .rt-legend{display:flex;flex-wrap:wrap;gap:14px;margin-bottom:24px;font-size:12px;color:var(--text-muted,#8a8178)}
 .rt-legend span{display:inline-flex;align-items:center;gap:5px}
 .rt-dot{width:9px;height:9px;border-radius:50%;display:inline-block}
@@ -56,6 +59,9 @@ function renderRoutePage(route, base, slug) {
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;');
 
+  // 多行文本：先转义再换行转 <br>（正文里手写的换行在卡片里要保留，否则会挤成一段）
+  const escBr = (s) => esc(s).replace(/\r?\n/g, '<br>');
+
   const prefix = base ? base + '/' : '';
 
   // ---- Day 导航 ----
@@ -83,7 +89,7 @@ function renderRoutePage(route, base, slug) {
         .map(
           (s) => `<div class="rt-card">
         <div class="rt-card-head"><h4 class="rt-card-name">${esc(s.name)}</h4></div>
-        ${s.desc ? `<p class="rt-card-desc">${esc(s.desc)}</p>` : ''}
+        ${s.desc ? `<p class="rt-card-desc">${escBr(s.desc)}</p>` : ''}
         ${(s.photos || []).length ? `<div class="rt-shots">${shots(s.photos)}</div>` : ''}
       </div>`
         )
@@ -93,8 +99,19 @@ function renderRoutePage(route, base, slug) {
         .map(
           (f) => `<div class="rt-card">
         <div class="rt-card-head"><h4 class="rt-card-name">${esc(f.name)}</h4></div>
-        ${f.desc ? `<p class="rt-card-desc">${esc(f.desc)}</p>` : ''}
+        ${f.desc ? `<p class="rt-card-desc">${escBr(f.desc)}</p>` : ''}
         ${(f.photos || []).length ? `<div class="rt-shots">${shots(f.photos)}</div>` : ''}
+      </div>`
+        )
+        .join('');
+
+      // 未归入 spots / food 的补充记录（正文里有、行程数据里没有的条目）
+      const extraCards = (d.extra || [])
+        .map(
+          (x) => `<div class="rt-card">
+        <div class="rt-card-head"><h4 class="rt-card-name">${esc(x.name)}</h4></div>
+        ${x.desc ? `<p class="rt-card-desc">${escBr(x.desc)}</p>` : ''}
+        ${(x.photos || []).length ? `<div class="rt-shots">${shots(x.photos)}</div>` : ''}
       </div>`
         )
         .join('');
@@ -108,11 +125,12 @@ function renderRoutePage(route, base, slug) {
           ${d.distance ? `<span>${esc(d.distance)}</span>` : ''}
           ${d.duration ? `<span>${esc(d.duration)}</span>` : ''}
         </div>
-        ${d.summary ? `<p class="rt-card-desc" style="margin-top:10px">${esc(d.summary)}</p>` : ''}
+        ${d.summary ? `<p class="rt-card-desc" style="margin-top:10px">${escBr(d.summary)}</p>` : ''}
         ${d.hotel ? `<div class="rt-hotel">住 <b>${esc(d.hotel)}</b></div>` : ''}
       </div>
       ${spotCards ? `<div class="rt-group"><div class="rt-group-title">景点</div>${spotCards}</div>` : ''}
       ${foodCards ? `<div class="rt-group"><div class="rt-group-title">吃了</div>${foodCards}</div>` : ''}
+      ${extraCards ? `<div class="rt-group"><div class="rt-group-title">其他</div>${extraCards}</div>` : ''}
     </section>`;
     })
     .join('\n');
@@ -137,8 +155,6 @@ function renderRoutePage(route, base, slug) {
 <nav class="rt-nav" id="rt-nav">${nav}</nav>
 ${panels}
 
-<link rel="stylesheet" href="${prefix}vendor/leaflet/leaflet.css">
-<script src="${prefix}vendor/leaflet/leaflet.js"></script>
 <script id="rt-data" type="application/json">${JSON.stringify(mapData)
     .replace(/</g, '\\u003c')
     .replace(/>/g, '\\u003e')
@@ -147,7 +163,7 @@ ${panels}
 (function () {
   var days = JSON.parse(document.getElementById('rt-data').textContent);
   var nav = document.getElementById('rt-nav');
-  var panels = document.querySelectorAll('.rt-panel-fallback, [data-rt-panel]');
+  var panels = document.querySelectorAll('[data-rt-panel]');
 
   // Day 切换
   nav.addEventListener('click', function (e) {
@@ -194,4 +210,17 @@ ${panels}
 `;
 }
 
-module.exports = { ROUTE_CSS, renderRoutePage };
+/**
+ * 行程页需要的 <head> 资源（Leaflet 本地副本）。
+ * 必须放在 <head> 里：leaflet.css 若在 body 中部才加载，地图会先按无样式渲染。
+ * @param {string} base 资源路径前缀（'..'）
+ */
+function routeHead(base) {
+  const prefix = base ? base + '/' : '';
+  return (
+    `<link rel="stylesheet" href="${prefix}vendor/leaflet/leaflet.css">` +
+    `<script src="${prefix}vendor/leaflet/leaflet.js"></script>`
+  );
+}
+
+module.exports = { ROUTE_CSS, renderRoutePage, routeHead };

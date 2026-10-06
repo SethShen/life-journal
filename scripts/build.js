@@ -8,7 +8,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { ROUTE_CSS, renderRoutePage } = require('./route-page');
+const { ROUTE_CSS, renderRoutePage, routeHead } = require('./route-page');
 
 const ROOT = path.resolve(__dirname, '..');
 const CONTENT_DIR = path.join(ROOT, 'content');
@@ -324,6 +324,160 @@ function monthCn(ym) {
 }
 
 /**
+ * 行程页（map: true）专用：把正文里的「## Day …」小节摘掉。
+ *
+ * 原因：这些小节与 Day 面板展示的是同一批内容，直接渲染会重复一遍。
+ * 摘掉后正文只保留导语与其它 ## 小节（如「花费小结」），
+ * Day 面板成为唯一的逐日视图。
+ */
+function stripDaySections(body) {
+  const norm = String(body).replace(/\r\n/g, '\n');
+  const chunks = norm.split(/^(##\s+.+)$/m);
+  let out = chunks[0];
+  for (let i = 1; i < chunks.length; i += 2) {
+    const title = chunks[i].replace(/^##\s+/, '').trim();
+    if (/^Day\b/i.test(title)) continue;
+    out += chunks[i] + (chunks[i + 1] || '');
+  }
+  return out.replace(/\n{3,}/g, '\n\n').trim();
+}
+
+/** 行程页：导语放地图之前，结尾引用块（如「花费小结」）放 Day 面板之后 */
+function splitLead(html) {
+  const at = String(html).indexOf('<blockquote');
+  if (at === -1) return [String(html), ''];
+  return [String(html).slice(0, at), String(html).slice(at)];
+}
+
+/** 从正文抽 ### 小节的叙事文本与图片，供合并进 Day 面板 */
+function extractNarrative(body) {
+  const norm = String(body).replace(/\r\n/g, '\n');
+  const parts = norm.split(/^(###\s+.+)$/m);
+  const sections = [];
+  for (let i = 1; i < parts.length; i += 2) {
+    const name = parts[i].replace(/^###\s+/, '').trim();
+    const raw = parts[i + 1] || '';
+    const photos = (raw.match(/photos:([A-Za-z0-9._-]+)/g) || []).map((x) =>
+      x.replace('photos:', '')
+    );
+    const plain = raw
+      .replace(/!\[[^\]]*\]\([^)]*\)/g, '') // 图片
+      .replace(/^\s*#{1,6}\s.*$/gm, '') // 其它级标题（### 之间可能夹着 ## Day N）
+      .replace(/_?[（(]未留下文字记录[)）]_?/g, '') // 占位符
+      .replace(/^[>\s]+/gm, '')
+      .replace(/[*_`]/g, '')
+      .replace(/[ \t]+$/gm, '')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+    sections.push({ idx: sections.length, name, plain, photos });
+  }
+  return sections;
+}
+
+/** 名称归一化：去空白、去括号内容、去连接符，用于兜底匹配 */
+function normName(s) {
+  return String(s || '')
+    .replace(/\s/g, '')
+    .replace(/[（(][^）)]*[）)]/g, '')
+    .replace(/[·・\-—–_:：]/g, '')
+    .toLowerCase();
+}
+
+/**
+ * 把正文叙事合并进行程数据：
+ *  1. 每个 spots/food 条目优先按照片编号匹配正文小节，匹配不到再按名称；
+ *     正文更长时才覆盖 desc（正文是原始记录，行程数据里的 desc 是压缩版）。
+ *  2. 正文里的「酒店」小节合并进当天的 hotel 字段。
+ *  3. 没匹配上的正文小节，按其在正文中的位置挂到「最近的、前面已匹配到的」那一天，
+ *     作为 extra 卡片，避免任何内容被丢掉。
+ * 返回 { route, unused }，unused 为空表示全部内容都找到了位置。
+ */
+function mergeNarrative(route, sections) {
+  const pool = sections.slice();
+  const take = (pred) => {
+    const i = pool.findIndex(pred);
+    return i === -1 ? null : pool.splice(i, 1)[0];
+  };
+  const dayOfIdx = new Map(); // 正文小节 idx -> day
+
+  // route 侧同名计数：归一化后同名的条目/酒店不唯一时，禁用模糊匹配，只认全等，
+  // 否则会出现「张冠李戴」（例如三家「汉庭酒店」各自带备注时分不清谁是谁）
+  const itemNameCount = new Map();
+  for (const d of route) {
+    for (const it of [...(d.spots || []), ...(d.food || [])]) {
+      const k = normName(it.name);
+      if (k) itemNameCount.set(k, (itemNameCount.get(k) || 0) + 1);
+    }
+  }
+  const hotelNameCount = new Map();
+  for (const d of route) {
+    if (!d.hotel) continue;
+    const k = normName(String(d.hotel).split(/[—–]/)[0].trim());
+    if (k) hotelNameCount.set(k, (hotelNameCount.get(k) || 0) + 1);
+  }
+
+  const fill = (items, d) => {
+    for (const it of items || []) {
+      let sec = null;
+      // ① 照片编号匹配（最可靠）
+      if ((it.photos || []).length) {
+        sec = take((s) => s.photos.some((p) => it.photos.includes(p)));
+      }
+      // ② 名称匹配：全等优先；仅当同名条目唯一时才放宽到「归一化后全等」
+      if (!sec) {
+        const raw = String(it.name).trim();
+        const key = normName(it.name);
+        sec = take((s) => String(s.name).trim() === raw);
+        if (!sec && key && (itemNameCount.get(key) || 0) === 1) {
+          sec = take((s) => normName(s.name) === key);
+        }
+      }
+      if (!sec) continue;
+      dayOfIdx.set(sec.idx, d.day);
+      if (sec.plain && sec.plain.length > String(it.desc || '').length) it.desc = sec.plain;
+    }
+  };
+
+  for (const d of route) {
+    fill(d.spots, d);
+    fill(d.food, d);
+
+    if (d.hotel) {
+      // route 的 hotel 可能是「名称 — 备注」，按名称匹配正文小节
+      const namePart = String(d.hotel).split(/[—–]/)[0].trim();
+      const hk = normName(namePart);
+      const ambiguous = (hotelNameCount.get(hk) || 0) > 1;
+      const sec = take(
+        (s) => String(s.name).trim() === namePart || (!ambiguous && normName(s.name) === hk)
+      );
+      if (sec) {
+        dayOfIdx.set(sec.idx, d.day);
+        if (sec.plain) {
+          // 已有备注则整体替换（避免「— A — B」叠加同一件事）
+          const cur = String(d.hotel).includes('—')
+            ? String(d.hotel).split(/[—–]/).slice(1).join(' — ').trim()
+            : '';
+          if (sec.plain.length > cur.length) d.hotel = namePart + ' — ' + sec.plain;
+        }
+      }
+    }
+  }
+
+  // 剩余的挂到「前面最近一次匹配到的」那一天
+  const byIdxDesc = [...dayOfIdx.entries()].sort((a, b) => a[0] - b[0]);
+  for (const sec of pool) {
+    let day = route[0] ? route[0].day : null;
+    for (const [idx, dd] of byIdxDesc) if (idx < sec.idx) day = dd;
+    const target = route.find((d) => String(d.day) === String(day)) || route[route.length - 1];
+    if (!target) continue;
+    if (!target.extra) target.extra = [];
+    target.extra.push({ name: sec.name, desc: sec.plain, photos: sec.photos });
+  }
+
+  return { route, unused: pool };
+}
+
+/**
  * 读取一个内容目录，返回记录数组。
  * @param {string} dir内容目录
  * @param {string} base 资源路径前缀（'' = 首页同级；'..' = 子目录）
@@ -379,6 +533,7 @@ function readRecords(dir, base = '..') {
     }
 
     const cover = meta.cover || photos[0] || '';
+    const isMap = /^(true|yes|1)$/i.test(String(meta.map).trim());
 
     return {
       file,
@@ -394,9 +549,11 @@ function readRecords(dir, base = '..') {
       month: meta.month || String(meta.date || nameBase).slice(0, 7),
       monthCn: monthCn(meta.month || meta.date || nameBase),
       // 行程数据（可选）：front-matter 的 map: true + route: 缩进块
-      map: /^(true|yes|1)$/i.test(String(meta.map).trim()),
+      map: isMap,
       route: Array.isArray(meta.route) ? meta.route : null,
-      html: renderMarkdown(body, slug, base),
+      // 行程页：正文里的「## Day …」由 Day 面板承载，不重复渲染
+      narrative: isMap ? extractNarrative(body) : [],
+      html: renderMarkdown(isMap ? stripDaySections(body) : body, slug, base),
       bodyRaw: body,
     };
   });
@@ -408,6 +565,13 @@ function renderGallery(rec) {
   const re = /photos:([A-Za-z0-9._-]+)/g;
   let mm;
   while ((mm = re.exec(rec.bodyRaw)) !== null) usedInBody.add(mm[1]);
+
+  // 行程页：Day 面板里引用的照片同样算「已使用」（正文的 Day 小节是被摘掉的）
+  for (const d of rec.route || []) {
+    for (const it of [...(d.spots || []), ...(d.food || []), ...(d.extra || [])]) {
+      for (const p of it.photos || []) usedInBody.add(p);
+    }
+  }
 
   const restPhotos = rec.photos.filter((p) => !usedInBody.has(p));
   if (!restPhotos.length) return '';
@@ -573,18 +737,37 @@ function main() {
       )
       .join('');
 
-    // 行程页：map: true 时在正文前插入地图 + Day 面板
-    const routeBlock =
-      t.map && t.route && t.route.length ? renderRoutePage(t.route, '..', t.slug) : '';
+    // 行程页：map: true → 地图 + Day 面板成为唯一逐日视图
+    // 正文里的「## Day …」小节已在 readRecords 阶段摘掉，这里把原始叙事
+    // 按照片编号/名称合并回对应的 Day 卡片，避免重复又不丢内容。
+    let content;
+    let routeCss = '';
+    let routeHeadTags = '';
+    if (t.map && t.route && t.route.length) {
+      const merged = mergeNarrative(JSON.parse(JSON.stringify(t.route)), t.narrative || []);
+      t.route = merged.route; // 相册判定要看到合并后的引用
+      const orphan = merged.unused.filter((s) => s.plain).map((s) => s.name);
+      if (orphan.length) {
+        console.warn(`⚠️ ${t.slug}: 正文小节在 route 里没有对应条目，已按位置挂到当天 → ${orphan.join(' / ')}`);
+      }
+      const routeBlock = renderRoutePage(merged.route, '..', t.slug);
+      const [lead, tail] = splitLead(t.html);
+      content = lead + routeBlock + tail + renderGallery(t);
+      routeCss = ROUTE_CSS;
+      routeHeadTags = routeHead('..');
+    } else {
+      content = t.html + renderGallery(t);
+    }
 
     const html = applyTemplate(tripTpl, {
       title: escapeHtml(t.title),
       date: escapeHtml(t.date),
       location: escapeHtml(t.location),
       tags,
-      content: routeBlock + t.html + renderGallery(t),
+      content,
       photo_count: t.photos.length,
-      route_css: routeBlock ? ROUTE_CSS : '',
+      route_css: routeCss,
+      route_head: routeHeadTags,
       site_title: '生活记录',
     });
     fs.writeFileSync(path.join(OUT_DIR, 'trip', `${t.slug}.html`), html);
