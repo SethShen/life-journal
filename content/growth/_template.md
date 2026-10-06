@@ -3,7 +3,7 @@ title: 小雨的{{month_cn}}
 date: 2026-03-31
 month: 2026-03
 slug: 2026-03
-birthdate: 2023-03-15
+birthdate: 2023-03-16
 summary: 一句话概括这个月。
 tags: [出行]
 cover: 001.jpg
