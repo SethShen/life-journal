@@ -361,6 +361,7 @@ npm run dev               # 构建 + 本地预览 (http://localhost:8080)
 
 | 日期 | 类型 | 说明 |
 |---|---|---|
+| 2026-10-06 | chore | GitHub 仓库改名：`SethShen/life-journa` → **`SethShen/life-journal`**（修正手误，末尾补l）；本地 remote 已同步更新，fetch/push 验证通过。文档内的仓库名引用在上一条修订时已全部写成正确名，无需改动 |
 | 2026-10-06 | docs | **修正部署信息错误**：第 7 节原写「Gitee 私有仓库 + Gitee Pages」为**事实错误**，实际代码始终托管在 GitHub（`git@github.com:SethShen/life-journal.git`，私有）。重写第 7 节为「Cloudflare Pages 连 GitHub（唯一在用）」+ wrangler 备选 + GitHub Pages 留档；第 3 节目录结构补`DEPLOY_CLOUDFLARE.md`、移除不存在的 `screenshots/`、补全 7 篇游记与 91 张照片的实际清单；README / DEPLOY.md / .codebuddy-memory.md 同步对齐 |
 | 2026-10-06 | chore | **仓库托管切换至 Gitee**（`gitee.com/seth_shen/life-journal`，私有），因开发环境无法访问 GitHub；新增 `DEPLOY.md` 部署指引；第 7 节重写（**已于同日撤销，实际未使用 Gitee，见上一条**） |
 | 2026-10-01 | content | 集成**青甘大环线六日自驾**游记（`2026-06-08-qinggan-2026.md`）：37 个站点、78 张照片（压缩后 9.8MB），原文一字未改，按 Day1-6 分章节 |
