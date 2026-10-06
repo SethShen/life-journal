@@ -3,8 +3,8 @@ title: 小雨的{{month_cn}}
 date: 2026-03-31
 month: 2026-03
 slug: 2026-03
-birthdate: 2024-05-20
-age: 1 岁 10 个月
+birthdate: 2023-03-15
+age:
 summary: 一句话概括这个月。
 tags: [成长]
 cover: 001.jpg
