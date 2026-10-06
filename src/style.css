@@ -452,6 +452,26 @@ body {
   color: var(--al-ink-3);
 }
 
+.al-body figure.video {
+  margin: 24px 0 8px;
+}
+
+.al-body figure.video video {
+  width: 100%;
+  border-radius: 12px;
+  display: block;
+  background: var(--al-green-soft);
+}
+
+.al-body figure.video figcaption {
+  margin-top: 10px;
+  padding-left: 12px;
+  border-left: 2px solid var(--al-green-lt);
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--al-ink-3);
+}
+
 .al-body > img {
   width: 100%;
   border-radius: 12px;

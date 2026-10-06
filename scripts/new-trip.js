@@ -72,9 +72,8 @@ date: ${date}
 month: ${month}
 slug: ${month}
 birthdate: ${birthdate}
-age: ${age || '（待填）'}
 summary: 一句话概括这个月。
-tags: [成长]
+tags: [出行]
 cover: 001.jpg
 ---
 
@@ -88,17 +87,20 @@ cover: 001.jpg
 > 地点。海拔或时长。
 > 客观事实描述，40–80 字。
 
-〔图说〕四到八字。
+::: stats
+900 m | 海拔
+18 ℃ | 气温
+:::
 
-![图片说明](photos:001.jpg)
+![图说：四到八字](photos:001.jpg)
+
+![图说：五到八字](photos:002.jpg)
 
 ## 02 站点名
 
 > 地点。第二站的内容。
 
-〔图说〕四到八字。
-
-![图片说明](photos:002.jpg)
+![图说：四到八字](photos:003.jpg)
 
 ## 本月小结
 

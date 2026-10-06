@@ -109,6 +109,7 @@ AI 会按 `PROJECT_SUMMARY.md` 里的规范自动完成：建文件 → 写内�
 | 目录 | 作用 | 要改吗 |
 |---|---|---|
 | `content/` | 每篇游记一个 Markdown | ✅ 常改 |
+| `content/growth/` | 成长足迹，每月一版（女儿小雨） | ✅ 常改 |
 | `photos/` | 照片，按 slug 分目录 | ✅ 常改 |
 | `templates/` | HTML 骨架 | 🔧 改版式时 |
 | `src/style.css` | 全站样式 | 🎨 改外观时 |

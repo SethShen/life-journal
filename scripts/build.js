@@ -85,6 +85,21 @@ function renderMarkdown(md, slug, base = '') {
     return `<figure class="photo"><img src="${src}" alt="${alt}" loading="lazy"><figcaption>${alt}</figcaption></figure>`;
   });
 
+  // 1.5) 视频 ![说明](video:xxx.mp4) → <video>，可选封面 video:xxx.mp4|video_poster.jpg
+  html = html.replace(/!\[([^\]]*)\]\(video:([^)|]+)(?:\|([^)]+))?\)/g, (_, alt, file, poster) => {
+    const src = `${prefix}photos/${slug}/${file.trim()}`;
+    const posterAttr = poster
+      ? ` poster="${prefix}photos/${slug}/${poster.trim()}"`
+      : '';
+    return (
+      `<figure class="video">` +
+      `<video controls playsinline preload="metadata"${posterAttr}>` +
+      `<source src="${src}" type="video/mp4">你的浏览器不支持视频播放。</video>` +
+      (alt ? `<figcaption>${alt}</figcaption>` : '') +
+      `</figure>`
+    );
+  });
+
   // 2) 普通图片
   html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, src) => {
     return `<img src="${src}" alt="${alt}" loading="lazy">`;
@@ -269,6 +284,31 @@ function readRecords(dir, base = '..') {
         .readdirSync(photoDir)
         .filter((f) => /\.(jpe?g|png|webp|gif)$/i.test(f))
         .sort();
+    }
+
+    // 视频封面（被 video:xxx.mp4|video_poster.jpg 引用的）不算「照片」，
+    // 不计入 photo_count，也不进底部「其余照片」相册
+    const videoPosters = new Set();
+    const posterRe = /video:[^)|]+\|([^)|]+)/g;
+    let pm;
+    while ((pm = posterRe.exec(body)) !== null) videoPosters.add(pm[1].trim());
+    if (videoPosters.size) {
+      photos = photos.filter((f) => !videoPosters.has(f));
+    }
+
+    // 校验：视频封面若与正文引用的照片同名，会造成计数与画面不一致
+    if (videoPosters.size) {
+      const usedInBody = new Set();
+      const re = /photos:([A-Za-z0-9._-]+)/g;
+      let mm;
+      while ((mm = re.exec(body)) !== null) usedInBody.add(mm[1]);
+      for (const p of videoPosters) {
+        if (usedInBody.has(p)) {
+          console.warn(
+            `⚠️ ${file}: 视频封面 ${p} 同时被 photos: 引用，计数可能不一致`
+          );
+        }
+      }
     }
 
     const cover = meta.cover || photos[0] || '';
