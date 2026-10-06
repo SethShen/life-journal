@@ -82,19 +82,25 @@ AI 会按 `PROJECT_SUMMARY.md` 里的规范自动完成：建文件 → 写内�
 
 ## 部署到 Cloudflare Pages
 
-1. 在 GitHub 新建**私有**仓库，推送本项目
-2. 打开 [Cloudflare Pages](https://dash.cloudflare.com/) → Create a project → 连接 Git 仓库
+代码托管在 **GitHub 私有仓库** `SethShen/life-journal`，Cloudflare Pages 连GitHub 后 **push 即自动部署**。
+
+1. 打开 [Cloudflare Pages](https://dash.cloudflare.com/) → Workers & Pages → Create
+2. 选 **Pages** → **Connect to Git** → 授权 **GitHub** → 选 `life-journal` 仓库
 3. 构建配置填：
 
    | 项 | 值 |
    |---|---|
    | Framework preset | None |
+   | Production branch | `main` |
    | Build command | `npm run build` |
    | Build output directory | `public` |
 
-4. 保存 → 自动部署 → 得到 `https://<项目名>.pages.dev`
+4. 保存 → 自动部署 → 得到 `https://life-journal-xxx.pages.dev`
 
-也可用 GitHub Pages（已附 `.github/workflows/deploy.yml`）。
+**本项目零第三方依赖**，Cloudflare 构建时不需要 `npm install` 也能跑通。
+
+> 更详细的分步图文指引见 **[DEPLOY_CLOUDFLARE.md](./DEPLOY_CLOUDFLARE.md)**；
+> 不想绑定 Git 仓库时可用 wrangler 手动上传（见该文件「替代方案」）。
 
 ---
 

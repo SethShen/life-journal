@@ -75,31 +75,40 @@ content/*.md  +  photos/**  +  templates/**
 life-journal/
 ├── PROJECT_SUMMARY.md      ← 本文档（AI 入口，唯一权威）
 ├── AGENTS.md               ← AI 工作约定（强制同步本文档）
-├── DEPLOY.md               ← 部署与更新指引
+├── DEPLOY.md               ← 日常更新与推送流程
+├── DEPLOY_CLOUDFLARE.md    ← Cloudflare Pages 部署详解（含 wrangler 备选方案）
 ├── .codebuddy-memory.md    ← 项目持久化记忆
 ├── README.md               ← 给人看的使用说明
 ├── package.json            ← 脚本入口（build / dev / new / compress）
 ├── content/                ← 【内容区】每篇游记一个 md
 │   ├── _template.md        ← 新游记模板
-│   └── 2026-01-01-sample-trip.md
-├── photos/                 ← 【资源区】按 slug 分目录
-│   └── sample-trip/
-│       ├── 001.jpg
-│       └── 002.jpg
+│   ├── 2024-07-15-qinghai.md
+│   ├── 2024-10-02-beijing.md
+│   ├── 2025-03-20-hangzhou.md
+│   ├── 2025-08-08-xiamen.md
+│   ├── 2026-01-01-sample-trip.md
+│   ├── 2026-04-12-chengdu.md
+│   └── 2026-06-08-qinggan-2026.md      ← 78 张照片，最大的一篇
+├── photos/                 ← 【资源区】按 slug 分目录（7 个目录，共 91 张）
+│   ├── beijing/  chengdu/  hangzhou/  qinghai/
+│   ├── qinggan-2026/       ← 78 张
+│   ├── sample-trip/  xiamen/
 ├── templates/              ← 【模板区】HTML 骨架
 │   ├── index.html          ← 首页（含筛选栏与筛选脚本）
-│   └── trip.html           ← 详情页
+│   └── trip.html           ← 详情页（含灯箱）
 ├── scripts/
 │   ├── build.js            ← 构建：md → html（含筛选数据注入）
-│   ├── compress-images.js  ← 压缩照片
+│   ├── compress-images.js  ← 压缩照片（需 npm i -D sharp）
 │   ├── new-trip.js         ← 一键创建新游记骨架
-│   └── dev.js              ← 本地预览服务器
+│   └── dev.js              ← 本地预览服务器（8080）
 ├── src/
-│   └── style.css           ← 全站样式（CSS 变量集中配色）
-├── screenshots/            ← 效果图（可删）
+│   └── style.css           ← 全站样式（CSS 变量集中配色，含深色模式）
+├── public/                 ← 构建产物（.gitignore 已忽略，不提交）
 └── .github/workflows/
-    └── deploy.yml          ← GitHub Pages 部署（Cloudflare 备选方案）
+    └── deploy.yml          ← GitHub Pages 部署（私有仓库下实际不可用，仅留档）
 ```
+
+> 注：`.gitignore` 中已忽略 `screenshots/`、`public/`、`node_modules/`、`*.log`，这些目录不出现在仓库中。
 
 ---
 
@@ -264,37 +273,52 @@ tags: [旅行, 海边, 冬季]
 
 | 项 | 值 |
 |---|---|
-| **远程仓库** | https://gitee.com/seth_shen/life-journal （**私有**） |
-| 平台 | Gitee（国内可直连；GitHub 在本项目开发环境中不可达） |
+| **远程仓库** | git@github.com:SethShen/life-journal.git（**私有**） |
+| 平台 | GitHub（私有仓库） |
 | 分支 | `main` |
+| 托管方式 | Cloudflare Pages 连GitHub，push 自动构建发布 |
 
-### 方案 A：Gitee Pages
+> ⚠️ **历史说明**：2026-10-06 之前本文档曾错误地记为「Gitee 私有仓库」。实际从未使用 Gitee，代码始终托管在 GitHub。该错误已于 2026-10-06 修正。
 
-需**实名认证**，且为**手动部署**（改完要手动点"更新"）。
+### 方案 A：Cloudflare Pages（推荐，唯一在用）
 
-1. https://gitee.com/seth_shen/life-journal/pages
-2. 完成实名认证
-3. 部署分支选 `master`（Gitee Pages 传统上只认此分支）
-4. 点「启动」/「更新」
+连GitHub 仓库，push 后自动构建，无需手动操作。
 
-### 方案 B：Cloudflare Pages（推荐，自动部署）
-
-支持连接 Gitee 仓库，push 后自动构建。
-
-1. https://dash.cloudflare.com/ → Workers & Pages → Create
-2. 选 Pages → Connect to Git → 授权 Gitee → 选 `life-journal`
+1. https://dash.cloudflare.com/ → **Workers & Pages** → **Create**
+2. 选 **Pages** → **Connect to Git** → 授权 **GitHub** → 选 `life-journal`
 3. 构建配置：
-   - Build command: `npm run build`
-   - Build output directory: `public`
-4. Save and Deploy
 
-之后每次 push 自动重新部署。
+   | 字段 | 值 |
+   |---|---|
+   | Project name | `life-journal` |
+   | Production branch | `main` |
+   | Framework preset | `None` |
+   | Build command | `npm run build` |
+   | Build output directory | `public` |
+   | Root directory | 留空 |
+
+4. Save and Deploy → 得到 `https://life-journal-xxx.pages.dev`
+
+**本项目零第三方依赖**，Cloudflare 构建时无需 `npm install` 即可完成构建。
+
+### 方案 B：wrangler 命令行手动上传（备选）
+
+不想让 Cloudflare 连接 GitHub 时使用。详见 `DEPLOY_CLOUDFLARE.md`。
+
+```bash
+npm install -g wrangler
+wrangler login
+npm run build
+wrangler pages deploy public --project-name=life-journal
+```
+
+> 此方式**不会自动构建**，每次更新都要手动跑一次。
 
 ### 方案 C：GitHub Pages（备选）
 
-`.github/workflows/deploy.yml` 已就绪，但那需要能访问 GitHub。
+`.github/workflows/deploy.yml` 已就绪。因为仓库是**私有**的，GitHub Pages 免费版不托管私有仓库，此方案实际不可用，仅作留档。
 
-> 完整操作步骤见 `DEPLOY.md`。
+> 完整操作步骤见 `DEPLOY.md`（日常更新流程）与 `DEPLOY_CLOUDFLARE.md`（Cloudflare 部署详解）。
 
 ---
 
@@ -337,7 +361,8 @@ npm run dev               # 构建 + 本地预览 (http://localhost:8080)
 
 | 日期 | 类型 | 说明 |
 |---|---|---|
-| 2026-10-06 | chore | **仓库托管切换至 Gitee**（`gitee.com/seth_shen/life-journal`，私有），因开发环境无法访问 GitHub；新增 `DEPLOY.md` 部署指引；第 7 节重写 |
+| 2026-10-06 | docs | **修正部署信息错误**：第 7 节原写「Gitee 私有仓库 + Gitee Pages」为**事实错误**，实际代码始终托管在 GitHub（`git@github.com:SethShen/life-journal.git`，私有）。重写第 7 节为「Cloudflare Pages 连 GitHub（唯一在用）」+ wrangler 备选 + GitHub Pages 留档；第 3 节目录结构补`DEPLOY_CLOUDFLARE.md`、移除不存在的 `screenshots/`、补全 7 篇游记与 91 张照片的实际清单；README / DEPLOY.md / .codebuddy-memory.md 同步对齐 |
+| 2026-10-06 | chore | **仓库托管切换至 Gitee**（`gitee.com/seth_shen/life-journal`，私有），因开发环境无法访问 GitHub；新增 `DEPLOY.md` 部署指引；第 7 节重写（**已于同日撤销，实际未使用 Gitee，见上一条**） |
 | 2026-10-01 | content | 集成**青甘大环线六日自驾**游记（`2026-06-08-qinggan-2026.md`）：37 个站点、78 张照片（压缩后 9.8MB），原文一字未改，按 Day1-6 分章节 |
 | 2026-10-01 | feat | Markdown 解析器新增**表格支持**；详情页新增**灯箱**（全屏放大/切换/键盘操作）；照片改为「正文引用优先、其余进底册」策略；详情页头部显示照片总数 |
 | 2026-10-01 | docs | 新增 `AGENTS.md`（AI 工作约定）与 `.codebuddy-memory.md`（项目记忆）；第 3 节目录结构补充 AGENTS.md / screenshots / dev.js；确立「每次更新必须同步本文档」为强制约定 |

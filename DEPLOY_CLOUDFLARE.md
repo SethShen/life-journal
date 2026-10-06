@@ -34,18 +34,16 @@ https://dash.cloudflare.com/sign-up
 
 ---
 
-## 步骤三：连接 Gitee 仓库
+## 步骤三：连接 GitHub 仓库
 
 这是关键一步。
 
-**如果看到 Gitee 选项：**
-- 点 **Gitee** → 授权登录 → 选择 `life-journal` 仓库
+1. 点 **GitHub** → 授权 Cloudflare 访问你的仓库
+2. 在仓库列表里找到并选择 `life-journal`
 
-**如果只看到 GitHub / GitLab：**
-- 说明 Cloudflare 当前界面没有直接给 Gitee 入口
-- **改用「直接上传」方式**（见下方「替代方案」）
-
-> ⚠️ 注意：Cloudflare 对 Gitee 的支持时有时无。如果找不到 Gitee，别纠结，走替代方案。
+> 如果列表里没有它，检查 GitHub → Settings → Applications → Installed GitHub Apps，
+> 确认 Cloudflare Pages 已安装并勾选了该仓库的访问权限。
+> 私有仓库首次连接可能需要先在 GitHub 侧重新授权一次。
 
 ---
 
@@ -93,7 +91,7 @@ https://life-journal-xxx.pages.dev
 
 ## 替代方案：直接上传（无需连 Git）
 
-如果 Cloudflare 连不上 Gitee，用这个：
+如果不想让 Cloudflare 连接 GitHub（或私有仓库授权不顺），用这个：
 
 **方法 1：网页拖拽上传**
 
